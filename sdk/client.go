@@ -280,6 +280,9 @@ func validateTunnelID(id string) error {
 }
 
 func validatePortNumber(port int) error {
+	if port == -1 {
+		return nil // -1 means all ports
+	}
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("%w: got %d", ErrInvalidPort, port)
 	}
