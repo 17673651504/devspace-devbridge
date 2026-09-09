@@ -319,3 +319,44 @@ body {
     overflow-x: auto;
   }
 }
+
+.video-card {
+  overflow: hidden;
+  margin: 4px 0 8px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  background: var(--vp-c-bg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 4%);
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+}
+
+.video-card:hover {
+  border-color: var(--vp-c-brand-1);
+  box-shadow: 0 6px 18px rgb(0 103 184 / 16%);
+}
+
+.dark .video-card:hover {
+  box-shadow: 0 6px 18px rgb(0 0 0 / 35%);
+}
+
+.video-card-media {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #0a1a2b;
+}
+
+.video-card-caption {
+  padding: 11px 14px;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.video-card-title {
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
