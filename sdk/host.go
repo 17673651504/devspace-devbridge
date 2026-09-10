@@ -220,17 +220,25 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 	if len(ports) == 0 {
 		printPorts = pn.ports
 	}
-	for _, p := range printPorts {
+
+	// 过滤掉"所有端口"哨兵值：它只对 visitor URL 访问有意义，
+	// host 端不需要为 -1 发起本地端口转发。
+	realPorts := filterForwardPorts(printPorts)
+	if len(realPorts) == 0 && len(printPorts) > 0 {
+		c.statusln("All ports mode: this tunnel accepts any port via URL")
+		c.statusf("Access your service at: https://%s-<port>.%s\n", tunnelID, c.gatewayHost)
+	}
+	for _, p := range realPorts {
 		c.statusf("Hosting port: %s%d%s\n", colorCyan, p, colorReset)
 	}
-	for _, p := range printPorts {
+	for _, p := range realPorts {
 		c.statusf("Tunnel URL: https://%s-%d.%s\n", tunnelID, p, c.gatewayHost)
 	}
 	c.statusln("Ready to accept connections")
 	c.statusln("Auto reconnect: enabled")
 
 	if onReady != nil {
-		onReady(printPorts)
+		onReady(realPorts)
 	}
 
 	// 等待断开
@@ -328,7 +336,8 @@ func (c *Client) handleRelayChannel(ctx context.Context, channel *ssh.Channel, t
 	// 设置端口转发
 	pfs := tcp.GetPortForwardingService(&innerSession.Session)
 	if pfs != nil && len(ports) > 0 {
-		for _, port := range ports {
+		// 过滤"所有端口"哨兵值（-1），不被转发（不是合法监听端口）。
+		for _, port := range filterForwardPorts(ports) {
 			if _, err := pfs.ForwardFromRemotePort(ctx, "127.0.0.1", port, "127.0.0.1", port); err != nil {
 				c.logger.Error("forward port failed", "port", port, "err", err)
 			}

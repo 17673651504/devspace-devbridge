@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -27,16 +26,14 @@ const (
 
 var (
 	versionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)-release$`)
-	once         sync.Once
-	cachedResult *CheckResult
 )
 
 // CheckResult holds the version check result.
 type CheckResult struct {
-	LatestVersion  string `json:"latestVersion"`
-	LatestTag      string `json:"latestTag"`
-	CheckedAt      int64  `json:"checkedAt"`
-	LastNotifyAt   int64  `json:"lastNotifyAt"` // last time async notice was printed
+	LatestVersion string `json:"latestVersion"`
+	LatestTag     string `json:"latestTag"`
+	CheckedAt     int64  `json:"checkedAt"`
+	LastNotifyAt  int64  `json:"lastNotifyAt"` // last time async notice was printed
 }
 
 // gitcodeRelease represents a single release from the GitCode API.
@@ -240,7 +237,6 @@ func ForceCheck(currentVersion string) *CheckResult {
 	if err == nil {
 		_ = os.Remove(path)
 	}
-	once = sync.Once{}
 	return Check(currentVersion)
 }
 

@@ -171,14 +171,20 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 
 	c.statusf("Connected to tunnel: %s\n", tunnelID)
 
-	if len(ports) > 0 {
+	// 过滤"所有端口"哨兵值（-1）。这种隧道只能通过 URL 访问任意端口，
+	// connect 端无需为 -1 建立本地监听。
+	realPorts := filterForwardPorts(ports)
+
+	if len(realPorts) > 0 {
 		c.statusln("Mode: active forwarding (ports from API)")
+	} else if len(ports) > 0 {
+		c.statusf("All ports mode: access via URL instead, e.g. https://%s-<port>.%s\n", tunnelID, c.gatewayHost)
 	} else {
 		c.statusln("Mode: passive forwarding (ports from host via SSH)")
 	}
 
 	// 等待转发建立
-	if len(ports) > 0 {
+	if len(realPorts) > 0 {
 		factory.waitForForwardings(3 * time.Second)
 	} else {
 		factory.waitForForwardings(2 * time.Second)

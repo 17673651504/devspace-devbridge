@@ -40,6 +40,11 @@ var (
 	tunnelNameRegexp = regexp.MustCompile(`^[\x{4e00}-\x{9fa5}A-Za-z0-9]([\x{4e00}-\x{9fa5}A-Za-z0-9-]{0,62}[\x{4e00}-\x{9fa5}A-Za-z0-9])?$`)
 )
 
+// AllPortsSentinel 表示"所有端口"的哨兵值，对应后端存储的 -1。
+// 它只对 visitor URL 访问有意义（网关按 SNI 动态路由任意端口），
+// host/connect 的 SSH 主动端口转发不应转发该值。
+const AllPortsSentinel = -1
+
 // Config holds the SDK client configuration. A zero Config is valid —
 // missing fields fall back to environment variables and sensible defaults.
 type Config struct {
@@ -302,13 +307,27 @@ func validateTunnelID(id string) error {
 }
 
 func validatePortNumber(port int) error {
-	if port == -1 {
+	if port == AllPortsSentinel {
 		return nil // -1 means all ports
 	}
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("%w: got %d", ErrInvalidPort, port)
 	}
 	return nil
+}
+
+// filterForwardPorts 过滤掉"所有端口"哨兵值，返回仅包含真实端口（1-65535）的列表。
+// host/connect 的 SSH 端口转发不应转发 -1（哨兵值对应 uint32 的 4294967295，
+// 不是合法监听端口），它只对 visitor URL 访问有意义。
+func filterForwardPorts(ports []int) []int {
+	out := make([]int, 0, len(ports))
+	for _, p := range ports {
+		if p == AllPortsSentinel {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
 }
 
 func validateProtocol(protocol string) error {
