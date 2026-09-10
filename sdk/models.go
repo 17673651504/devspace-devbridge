@@ -1,7 +1,5 @@
 package devbridge
 
-import "encoding/json"
-
 // ──────────────────────────────────────────────────────────────
 // 数据模型 — 对应 DevBridge REST API 的请求/响应结构
 // ──────────────────────────────────────────────────────────────
@@ -87,16 +85,6 @@ type createPortRequest struct {
 
 type updatePortRequest struct {
 	AllowAnonymous *bool `json:"allowAnonymous,omitempty"`
-}
-
-// ──────────────────────────────────────────────────────────────
-// API 响应外层结构
-// ──────────────────────────────────────────────────────────────
-
-type apiResponse struct {
-	ErrorCode string          `json:"error_code"`
-	ErrorMsg  string          `json:"error_msg"`
-	Result    json.RawMessage `json:"result"`
 }
 
 // errorBody 是另一种错误格式（部分接口使用）

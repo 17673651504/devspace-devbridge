@@ -29,17 +29,21 @@ import (
 
 // HostConfig Host 托管配置
 type HostConfig struct {
-	TunnelID string   // 隧道 ID
-	Ports    []int    // 本地端口列表（为空时从网关下发）
-	JWTToken string   // JWT 令牌（与 APIKey 二选一）
-	APIKey   string   // API Key（与 JWTToken 二选一）
+	TunnelID string // 隧道 ID
+	Ports    []int  // 本地端口列表（为空时从网关下发）
+	JWTToken string // JWT 令牌（与 APIKey 二选一）
+	APIKey   string // API Key（与 JWTToken 二选一）
+
+	// OnReady 在会话就绪（端口开始转发）后调用，参数为本次托管的端口列表。
+	// 每次连接或重连成功都会触发一次。可为 nil。
+	OnReady func(ports []int)
 }
 
 // HostResult Host 运行结果信息
 type HostResult struct {
-	TunnelID  string   // 隧道 ID
-	Ports     []int    // 实际托管的端口
-	TunnelURL string   // 隧道访问地址
+	TunnelID  string // 隧道 ID
+	Ports     []int  // 实际托管的端口
+	TunnelURL string // 隧道访问地址
 }
 
 // relayPortMessage 网关下发的端口通知
@@ -110,7 +114,7 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 	everConnected := false
 
 	for consecutiveFailures < maxReconnectAttempts {
-		connected, err := c.runHostSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports)
+		connected, err := c.runHostSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, cfg.OnReady)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -144,7 +148,7 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 		if delay > maxReconnectDelay {
 			delay = maxReconnectDelay
 		}
-		fmt.Println("Connection lost, reconnecting...")
+		c.statusln("Connection lost, reconnecting...")
 		select {
 		case <-ctx.Done():
 			return nil
@@ -155,7 +159,7 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 }
 
 // runHostSession 执行一次 Host 会话
-func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int) (connected bool, err error) {
+func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, onReady func([]int)) (connected bool, err error) {
 	netConn, err := c.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
 	if err != nil {
 		return false, err
@@ -217,13 +221,17 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 		printPorts = pn.ports
 	}
 	for _, p := range printPorts {
-		fmt.Printf("Hosting port: %s%d%s\n", colorCyan, p, colorReset)
+		c.statusf("Hosting port: %s%d%s\n", colorCyan, p, colorReset)
 	}
 	for _, p := range printPorts {
-		fmt.Printf("Tunnel URL: https://%s-%d.%s\n", tunnelID, p, c.gatewayHost)
+		c.statusf("Tunnel URL: https://%s-%d.%s\n", tunnelID, p, c.gatewayHost)
 	}
-	fmt.Println("Ready to accept connections")
-	fmt.Println("Auto reconnect: enabled")
+	c.statusln("Ready to accept connections")
+	c.statusln("Auto reconnect: enabled")
+
+	if onReady != nil {
+		onReady(printPorts)
+	}
 
 	// 等待断开
 	for {

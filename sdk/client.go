@@ -62,6 +62,11 @@ type Config struct {
 	// HTTPClient optionally overrides the HTTP client.
 	// If nil, a default client with 30s timeout is used.
 	HTTPClient *http.Client
+
+	// StatusWriter receives user-facing status lines (connection progress,
+	// hosted ports, forwarding info). Defaults to os.Stdout; set it to
+	// io.Discard to silence these outputs.
+	StatusWriter io.Writer
 }
 
 // resolve returns a copy with defaults and env-var fallbacks applied.
@@ -78,6 +83,9 @@ func (cfg Config) resolve() Config {
 	}
 	if out.APIKey == "" {
 		out.APIKey = os.Getenv("HW_API_KEY")
+	}
+	if out.StatusWriter == nil {
+		out.StatusWriter = os.Stdout
 	}
 	if out.HTTPClient == nil {
 		out.HTTPClient = &http.Client{
@@ -98,6 +106,8 @@ type Client struct {
 	gatewayHost string       // WebSocket 网关 SNI host
 	httpClient  *http.Client // HTTP 客户端
 	logger      *slog.Logger // 日志
+
+	statusWriter io.Writer // 用户可见状态输出（连接进度、端口映射等），默认 os.Stdout
 }
 
 // NewClient creates a new SDK client from the given Config.
@@ -123,6 +133,8 @@ func NewClient(cfg Config) (*Client, error) {
 		gatewayHost: resolved.GatewayHost,
 		httpClient:  resolved.HTTPClient,
 		logger:      slog.Default(),
+
+		statusWriter: resolved.StatusWriter,
 	}, nil
 }
 
@@ -180,6 +192,16 @@ func (c *Client) logHTTPResponse(resp *http.Response, body []byte, elapsed time.
 			slog.String("size", fmt.Sprintf("%d bytes total", len(body))),
 		)
 	}
+}
+
+// statusf 将用户可见的状态行写到 StatusWriter（默认 os.Stdout）
+func (c *Client) statusf(format string, args ...any) {
+	fmt.Fprintf(c.statusWriter, format, args...)
+}
+
+// statusln 将用户可见的状态行写到 StatusWriter（默认 os.Stdout）
+func (c *Client) statusln(args ...any) {
+	fmt.Fprintln(c.statusWriter, args...)
 }
 
 // doRequest 发送 HTTP 请求并处理响应
