@@ -13,7 +13,7 @@ import (
 	"huawei.com/devbridge/internal/auth"
 	"huawei.com/devbridge/internal/config"
 	"huawei.com/devbridge/internal/sdk"
-	devbridge "huawei.com/devbridge/sdk"
+	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
 )
 
 var hostPorts []int

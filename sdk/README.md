@@ -13,7 +13,7 @@ DevBridge 是华为云的开发隧道服务，通过中继连接 Host（本地�
 ## 安装
 
 ```bash
-go get huawei.com/devbridge/sdk
+go get github.com/huaweicloud/devspace-devbridge/sdk
 ```
 
 ## 快速开始
@@ -28,7 +28,7 @@ import (
     "log"
     "time"
 
-    "github.com/huaweicloud/devbridge-sdk"
+    "github.com/huaweicloud/devspace-devbridge/sdk"
 )
 
 func main() {
