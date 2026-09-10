@@ -10,7 +10,7 @@ const props = defineProps({
 
 // 外链（http/https 开头）直接使用，仓库内路径补 base 前缀
 const videoSrc = computed(() =>
-  /^https?:\/\//.test(props.src) ? props.src : withBase(props.src)
+  /^https?:\/\//.test(props.src) ? props.src : withBase(props.src),
 );
 
 const videoPoster = computed(() => {
