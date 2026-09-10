@@ -10,9 +10,9 @@ description: 在本地托管服务后，从远端通过 Connect 建立连接并�
 ## 视频演示
 
 <VideoPlayer
-  src="/videos/devops-video.mp4"
-  poster="/images/best-practices/host-remote-connect-video.png"
-  title="托管与远程连接完整演示"
+  src="https://tools-artifact.developer.huaweicloud.com/sharedata/devbridge/video/devops-best-practice.mp4"
+  poster="/images/videos/devops-best-practice-video.png"
+  title="DevOps 最佳实践演示"
 />
 
 ## 场景说明

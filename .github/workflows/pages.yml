@@ -2,7 +2,7 @@ name: Deploy documentation
 
 on:
   push:
-    branches: [master]
+    branches: [develop, master]
   workflow_dispatch:
 
 permissions:
@@ -45,9 +45,8 @@ jobs:
           path: docs/.vitepress/dist
 
   deploy:
-    if: github.ref == 'refs/heads/master'
     environment:
-      name: github-pages-master
+      name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
     runs-on: ubuntu-latest

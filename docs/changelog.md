@@ -20,7 +20,6 @@
 
 ##### Host / Connect
 
-- `host` 和 `connect` 命令新增 `--token` / `-t` 参数，支持直接传入 JWT 令牌，跳过 API 令牌签发和端口查询。
 - `host` 和 `connect` 命令新增 `--api-key` / `-k` 参数，支持使用 API Key 鉴权，跳过 TunnelToken 签发。
 - `host` 和 `connect` 支持通过 `set` 设置的默认隧道，未指定隧道 ID 时自动使用。
 - `connect --token` 模式要求显式指定隧道 ID，不走默认隧道。
@@ -33,16 +32,7 @@
 
 - 移除 `list` 和 `port list` 命令的 `-j` / JSON 输出参数。
 - 移除 `--huaweicloud` flag 和 `loginType` 参数。
-
-### 服务端变更
-
-#### 新增
-
-##### API Key 管理
-
-- 新增 API Key 创建、查看和删除功能。
-- API Key 按 DevBridge、DevBox 使用场景区分，每个场景最多可创建 20 个。
-- API Key 完整值仅在创建时展示，列表显示脱敏值和最近使用时间；删除后立即失效。
+- 移除开发用自签名证书。
 
 ### 构建与发布
 
