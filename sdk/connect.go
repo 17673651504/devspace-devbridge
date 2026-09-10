@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -30,11 +31,15 @@ import (
 
 // ConnectConfig Connect 连接配置
 type ConnectConfig struct {
-	TunnelID string   // 隧道 ID
-	Ports    []int    // 端口列表（为空时从 Host 端通过 SSH 下发）
-	JWTToken string   // JWT 令牌（与 APIKey 二选一）
-	APIKey   string   // API Key（与 JWTToken 二选一）
-	LocalIP  string   // 本地监听地址，默认 127.0.0.1
+	TunnelID string // 隧道 ID
+	Ports    []int  // 端口列表（为空时从 Host 端通过 SSH 下发）
+	JWTToken string // JWT 令牌（与 APIKey 二选一）
+	APIKey   string // API Key（与 JWTToken 二选一）
+	LocalIP  string // 本地监听地址，默认 127.0.0.1
+
+	// OnReady 在会话就绪（本地端口映射建立）后调用，参数为本次建立的映射列表。
+	// 每次连接或重连成功都会触发一次。可为 nil。
+	OnReady func(forwardings []Forwarding)
 }
 
 // Forwarding 端口转发映射信息
@@ -87,7 +92,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 	sniHost := cfg.TunnelID + "." + c.gatewayHost
 	wsURL := "wss://" + sniHost + "/"
 
-	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, c.logger)
+	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, c.statusWriter, c.logger)
 
 	const maxReconnectAttempts = 5
 	const baseReconnectDelay = 3 * time.Second
@@ -95,7 +100,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 
 	consecutiveFailures := 0
 	for consecutiveFailures < maxReconnectAttempts {
-		connected, err := c.runConnectSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, factory)
+		connected, err := c.runConnectSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, factory, cfg.OnReady)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -124,7 +129,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 				break
 			}
 		}
-		fmt.Printf("Connection lost, reconnecting... (%v)\n", err)
+		c.statusf("Connection lost, reconnecting... (%v)\n", err)
 		select {
 		case <-ctx.Done():
 			return nil
@@ -135,7 +140,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 }
 
 // runConnectSession 执行一次 Connect 会话
-func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, factory *listenerFactory) (connected bool, err error) {
+func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, factory *listenerFactory, onReady func([]Forwarding)) (connected bool, err error) {
 	netConn, err := c.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
 	if err != nil {
 		return false, fmt.Errorf("WebSocket connection failed: %w", err)
@@ -164,12 +169,12 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 	}
 	connected = true
 
-	fmt.Printf("Connected to tunnel: %s\n", tunnelID)
+	c.statusf("Connected to tunnel: %s\n", tunnelID)
 
 	if len(ports) > 0 {
-		fmt.Println("Mode: active forwarding (ports from API)")
+		c.statusln("Mode: active forwarding (ports from API)")
 	} else {
-		fmt.Println("Mode: passive forwarding (ports from host via SSH)")
+		c.statusln("Mode: passive forwarding (ports from host via SSH)")
 	}
 
 	// 等待转发建立
@@ -180,7 +185,11 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 	}
 	factory.printForwardings()
 
-	fmt.Println("Auto reconnect: enabled")
+	c.statusln("Auto reconnect: enabled")
+
+	if onReady != nil {
+		onReady(factory.snapshotForwardings())
+	}
 
 	select {
 	case <-session.Session.Done():
@@ -198,20 +207,23 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 type listenerFactory struct {
 	mu                 sync.Mutex
 	pendingForwardings []string
+	forwardings        []Forwarding
 	portOverrides      map[int]int
 	listeners          []net.Listener
 	expectedCount      int
 	allReceived        chan struct{}
 	localIP            string
+	statusWriter       io.Writer
 	logger             *slog.Logger
 }
 
-func newListenerFactory(expectedCount int, localIP string, logger *slog.Logger) *listenerFactory {
+func newListenerFactory(expectedCount int, localIP string, statusWriter io.Writer, logger *slog.Logger) *listenerFactory {
 	return &listenerFactory{
 		expectedCount: expectedCount,
 		allReceived:   make(chan struct{}),
 		portOverrides: make(map[int]int),
 		localIP:       localIP,
+		statusWriter:  statusWriter,
 		logger:        logger,
 	}
 }
@@ -223,6 +235,9 @@ func (f *listenerFactory) CreateTCPListener(
 	localPort int,
 	canChangeLocalPort bool,
 ) (net.Listener, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if override, ok := f.portOverrides[remotePort]; ok {
 		localPort = override
 	}
@@ -230,19 +245,19 @@ func (f *listenerFactory) CreateTCPListener(
 	listener, err := net.Listen("tcp", net.JoinHostPort(f.localIP, strconv.Itoa(localPort)))
 	if err != nil {
 		if canChangeLocalPort {
-			return f.listenOnRandomPort(remotePort, localPort)
+			return f.listenOnRandomPortLocked(remotePort, localPort)
 		}
 		return nil, fmt.Errorf("port %d is already in use: %w", localPort, err)
 	}
 	f.portOverrides[remotePort] = localPort
 	f.listeners = append(f.listeners, listener)
-	f.addForwarding(fmt.Sprintf("Forwarding localhost: %s%d%s -> tunnel port: %s%d%s\n",
+	f.recordForwarding(localPort, remotePort, fmt.Sprintf("Forwarding localhost: %s%d%s -> tunnel port: %s%d%s\n",
 		colorCyan, localPort, colorReset, colorCyan, remotePort, colorReset))
 	return listener, nil
 }
 
-// listenOnRandomPort 本地端口被占用时，换一个随机端口
-func (f *listenerFactory) listenOnRandomPort(remotePort, originalPort int) (net.Listener, error) {
+// listenOnRandomPortLocked 本地端口被占用时，换一个随机端口。调用方需持有 f.mu。
+func (f *listenerFactory) listenOnRandomPortLocked(remotePort, originalPort int) (net.Listener, error) {
 	listener, err := net.Listen("tcp", net.JoinHostPort(f.localIP, "0"))
 	if err != nil {
 		return nil, err
@@ -250,18 +265,16 @@ func (f *listenerFactory) listenOnRandomPort(remotePort, originalPort int) (net.
 	actualPort := listener.Addr().(*net.TCPAddr).Port
 	f.portOverrides[remotePort] = actualPort
 	f.listeners = append(f.listeners, listener)
-	f.addForwarding(fmt.Sprintf("Forwarding localhost: %s%d%s -> tunnel port: %s%d%s (port %s%d%s in use)\n",
+	f.recordForwarding(actualPort, remotePort, fmt.Sprintf("Forwarding localhost: %s%d%s -> tunnel port: %s%d%s (port %s%d%s in use)\n",
 		colorCyan, actualPort, colorReset, colorCyan, remotePort, colorReset, colorYellow, originalPort, colorReset))
 	return listener, nil
 }
 
-func (f *listenerFactory) addForwarding(msg string) {
-	f.mu.Lock()
+// recordForwarding 记录一条端口映射并唤醒等待者。调用方需持有 f.mu。
+func (f *listenerFactory) recordForwarding(localPort, remotePort int, msg string) {
+	f.forwardings = append(f.forwardings, Forwarding{LocalPort: localPort, RemotePort: remotePort, LocalIP: f.localIP})
 	f.pendingForwardings = append(f.pendingForwardings, msg)
-	count := len(f.pendingForwardings)
-	f.mu.Unlock()
-
-	if count >= f.expectedCount && f.expectedCount > 0 {
+	if len(f.pendingForwardings) >= f.expectedCount && f.expectedCount > 0 {
 		select {
 		case <-f.allReceived:
 		default:
@@ -270,11 +283,18 @@ func (f *listenerFactory) addForwarding(msg string) {
 	}
 }
 
+// snapshotForwardings 返回当前已建立的端口映射副本
+func (f *listenerFactory) snapshotForwardings() []Forwarding {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]Forwarding(nil), f.forwardings...)
+}
+
 func (f *listenerFactory) printForwardings() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, msg := range f.pendingForwardings {
-		fmt.Print(msg)
+		fmt.Fprint(f.statusWriter, msg)
 	}
 }
 
@@ -286,6 +306,7 @@ func (f *listenerFactory) reset() {
 	}
 	f.listeners = nil
 	f.pendingForwardings = nil
+	f.forwardings = nil
 	f.allReceived = make(chan struct{})
 }
 

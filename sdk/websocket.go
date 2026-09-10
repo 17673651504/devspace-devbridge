@@ -111,11 +111,11 @@ func (c *Client) dialWithRetry(ctx context.Context, url string, opts *websocket.
 			_ = resp.Body.Close()
 			reason := strings.TrimSpace(string(body))
 			if attempt == 0 {
-				fmt.Printf("Connection rejected by gateway: %s, retrying...\n", reason)
+				c.statusf("Connection rejected by gateway: %s, retrying...\n", reason)
 			}
 			lastErr = fmt.Errorf("connection rejected by gateway (429): %s", reason)
 		} else if attempt == 0 {
-			fmt.Println("Connection failed, retrying...")
+			c.statusln("Connection failed, retrying...")
 		}
 
 		if attempt == maxRetries {
