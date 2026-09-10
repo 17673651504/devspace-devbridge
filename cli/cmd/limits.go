@@ -6,7 +6,7 @@ import (
 
 	"huawei.com/devbridge/internal/i18n"
 	"huawei.com/devbridge/internal/sdk"
-	devbridge "huawei.com/devbridge/sdk"
+	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
 
 	"github.com/spf13/cobra"
 )

@@ -3,7 +3,7 @@ package sdk
 import (
 	"huawei.com/devbridge/internal/auth"
 	"huawei.com/devbridge/internal/config"
-	devbridge "huawei.com/devbridge/sdk"
+	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
 )
 
 // ServerAddr WebSocket 网关地址（host:port），供 ldflags 注入。
