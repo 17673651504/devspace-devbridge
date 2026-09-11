@@ -25,7 +25,9 @@ const (
 )
 
 var (
-	versionRegex = regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)-release$`)
+	// 宽松匹配版本号：支持 v0.1.9 / 0.1.9 / 0.1.13.333 / 0.1.3-release / 0.1.3.release 等。
+	// 只解析开头的数字段（major.minor.patch[.build]），忽略任意后缀。
+	versionRegex = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?`)
 )
 
 // CheckResult holds the version check result.
@@ -41,39 +43,39 @@ type gitcodeRelease struct {
 	TagName string `json:"tag_name"`
 }
 
-// IsNewer compares current version with latest using semver.
-// Returns true if latest > current.
+// IsNewer compares current version with latest. Returns true if latest > current.
+// 版本号可以是 "0.1.9"、"0.1.13.333"（四段 build 号）、"0.1.3-release"、"0.1.3.release"，
+// 只比较开头的主版本/次版本/修订号/构建号，后缀被忽略。
 func IsNewer(current, latest string) bool {
-	curMajor, curMinor, curPatch, ok := parseVersion(current)
-	if !ok {
-		return false
-	}
-	latMajor, latMinor, latPatch, ok := parseVersion(latest)
-	if !ok {
-		return false
-	}
-	if latMajor != curMajor {
-		return latMajor > curMajor
-	}
-	if latMinor != curMinor {
-		return latMinor > curMinor
-	}
-	return latPatch > curPatch
+	return isNewerRaw(current, latest)
 }
 
-func parseVersion(v string) (major, minor, patch int, ok bool) {
-	// strip -release suffix if present
-	if len(v) > 8 && v[len(v)-8:] == "-release" {
-		v = v[:len(v)-8]
+func parseVersion(v string) (major, minor, patch, build int, ok bool) {
+	m := versionRegex.FindStringSubmatch(v)
+	if m == nil {
+		return 0, 0, 0, 0, false
 	}
-	parts := regexp.MustCompile(`^(\d+)\.(\d+)\.(\d+)$`).FindStringSubmatch(v)
-	if parts == nil {
-		return 0, 0, 0, false
+	major, _ = strconv.Atoi(m[1])
+	minor, _ = strconv.Atoi(m[2])
+	patch, _ = strconv.Atoi(m[3])
+	if m[4] != "" {
+		build, _ = strconv.Atoi(m[4])
 	}
-	major, _ = strconv.Atoi(parts[1])
-	minor, _ = strconv.Atoi(parts[2])
-	patch, _ = strconv.Atoi(parts[3])
-	return major, minor, patch, true
+	return major, minor, patch, build, true
+}
+
+// versionFromTag 从 tag 中提取规范化的数字版本号（如 "0.2.0-release" → "0.2.0"，
+// "0.1.13.333" → "0.1.13.333"），忽略后缀。非版本 tag（如 "latest"、"test-*"）返回 !ok。
+func versionFromTag(s string) (string, bool) {
+	m := versionRegex.FindStringSubmatch(s)
+	if m == nil {
+		return "", false
+	}
+	v := m[1] + "." + m[2] + "." + m[3]
+	if m[4] != "" {
+		v += "." + m[4]
+	}
+	return v, true
 }
 
 // cachePath returns the path to the version cache file.
@@ -144,8 +146,10 @@ func fetchLatestRelease() (string, error) {
 		if !versionRegex.MatchString(r.TagName) {
 			continue
 		}
-		// Extract version number (e.g. "0.2.0" from "0.2.0-release")
-		ver := r.TagName[:len(r.TagName)-8]
+		ver, ok := versionFromTag(r.TagName)
+		if !ok {
+			continue
+		}
 		if bestVer == "" || isNewerRaw(bestVer, ver) {
 			bestVer = ver
 			bestTag = r.TagName
@@ -154,23 +158,25 @@ func fetchLatestRelease() (string, error) {
 	if bestTag == "" {
 		return "", fmt.Errorf("no valid release found")
 	}
-	_ = bestVer
 	return bestTag, nil
 }
 
 func isNewerRaw(oldV, newV string) bool {
-	oldM, oldm, oldp, ok1 := parseVersion(oldV)
-	newM, newm, newp, ok2 := parseVersion(newV)
+	omaj, omin, opat, obuild, ok1 := parseVersion(oldV)
+	nmaj, nmin, npat, nbuild, ok2 := parseVersion(newV)
 	if !ok1 || !ok2 {
 		return false
 	}
-	if newM != oldM {
-		return newM > oldM
+	if nmaj != omaj {
+		return nmaj > omaj
 	}
-	if newm != oldm {
-		return newm > oldm
+	if nmin != omin {
+		return nmin > omin
 	}
-	return newp > oldp
+	if npat != opat {
+		return npat > opat
+	}
+	return nbuild > obuild
 }
 
 // Check performs a version check, using cache when available.
@@ -188,8 +194,8 @@ func Check(currentVersion string) *CheckResult {
 
 	// Extract version number from tag
 	latestVersion := latestTag
-	if match := versionRegex.FindStringSubmatch(latestTag); match != nil {
-		latestVersion = match[1] + "." + match[2] + "." + match[3]
+	if v, ok := versionFromTag(latestTag); ok {
+		latestVersion = v
 	}
 
 	result := &CheckResult{
