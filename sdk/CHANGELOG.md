@@ -4,6 +4,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- 恢复隧道描述校验：仅允许中文、字母、数字，长度 0-64（与 SDK 抽取前 CLI 行为一致）
+
 ### Changed
 
 - 模块路径变更为 `github.com/huaweicloud/devspace-devbridge/sdk`（原 `huawei.com/devbridge/sdk`）

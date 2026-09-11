@@ -25,6 +25,9 @@ var ErrQuotaExceeded = errors.New("account quota exceeded")
 // ErrInvalidTunnelID 隧道 ID 格式无效
 var ErrInvalidTunnelID = errors.New("invalid tunnel ID: must be 8 chars of lowercase letters and digits 2-7")
 
+// ErrInvalidTunnelDescription 隧道描述无效
+var ErrInvalidTunnelDescription = errors.New("invalid tunnel description: only Chinese characters, letters, digits, length 0-64")
+
 // ErrInvalidPort 端口号无效
 var ErrInvalidPort = errors.New("invalid port number: must be 1-65535")
 

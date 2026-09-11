@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -87,6 +88,9 @@ var createCmd = &cobra.Command{
 		}
 		result, err := client.CreateTunnel(context.Background(), args[0], tunnelDescription, exp)
 		if err != nil {
+			if errors.Is(err, devbridge.ErrInvalidTunnelDescription) {
+				return errors.New(i18n.T(i18n.Msg.Tunnel.TunnelDescInvalid))
+			}
 			return fmt.Errorf("%s: %w", i18n.T(i18n.Msg.Tunnel.CreateFailed), err)
 		}
 		printKV([][2]string{
@@ -160,6 +164,9 @@ var updateCmd = &cobra.Command{
 			return err
 		}
 		if err := client.UpdateTunnel(context.Background(), tunnelID, name, desc, exp); err != nil {
+			if errors.Is(err, devbridge.ErrInvalidTunnelDescription) {
+				return errors.New(i18n.T(i18n.Msg.Tunnel.TunnelDescInvalid))
+			}
 			return fmt.Errorf("%s: %w", i18n.T(i18n.Msg.Tunnel.UpdateFailed), err)
 		}
 		fmt.Println(i18n.T(i18n.Msg.Tunnel.TunnelUpdated))

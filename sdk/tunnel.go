@@ -18,6 +18,9 @@ func (c *Client) CreateTunnel(ctx context.Context, name, description string, exp
 	if !tunnelNameRegexp.MatchString(name) {
 		return nil, fmt.Errorf("invalid tunnel name: %q", name)
 	}
+	if err := validateTunnelDescription(description); err != nil {
+		return nil, err
+	}
 
 	req := createTunnelRequest{
 		Name:        name,
@@ -79,6 +82,9 @@ func (c *Client) UpdateTunnel(ctx context.Context, tunnelID string, name, descri
 		req.Name = name
 	}
 	if description != nil {
+		if err := validateTunnelDescription(*description); err != nil {
+			return err
+		}
 		req.Description = description
 	}
 	if expiration != nil {

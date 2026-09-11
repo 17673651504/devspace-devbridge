@@ -38,6 +38,7 @@ const (
 var (
 	tunnelIDRegexp   = regexp.MustCompile(`^[a-z2-7]{8}$`)
 	tunnelNameRegexp = regexp.MustCompile(`^[\x{4e00}-\x{9fa5}A-Za-z0-9]([\x{4e00}-\x{9fa5}A-Za-z0-9-]{0,62}[\x{4e00}-\x{9fa5}A-Za-z0-9])?$`)
+	tunnelDescRegexp = regexp.MustCompile(`^[\x{4e00}-\x{9fa5}A-Za-z0-9]{0,64}$`)
 )
 
 // AllPortsSentinel 表示"所有端口"的哨兵值，对应后端存储的 -1。
@@ -302,6 +303,13 @@ func (c *Client) delete(ctx context.Context, path string, result any) error {
 func validateTunnelID(id string) error {
 	if !tunnelIDRegexp.MatchString(id) {
 		return fmt.Errorf("%w: got %q", ErrInvalidTunnelID, id)
+	}
+	return nil
+}
+
+func validateTunnelDescription(description string) error {
+	if !tunnelDescRegexp.MatchString(description) {
+		return fmt.Errorf("%w: got %q", ErrInvalidTunnelDescription, description)
 	}
 	return nil
 }
