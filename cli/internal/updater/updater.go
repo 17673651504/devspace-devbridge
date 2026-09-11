@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -211,7 +212,9 @@ func Check(currentVersion string) *CheckResult {
 // It should be called from PersistentPreRun — it does not block command execution.
 // The async notice is printed at most once per day.
 func CheckAsync(currentVersion string) {
+	asyncWG.Add(1)
 	go func() {
+		defer asyncWG.Done()
 		result := Check(currentVersion)
 		if result == nil {
 			return
@@ -228,6 +231,26 @@ func CheckAsync(currentVersion string) {
 		fmt.Fprintf(os.Stderr, "\nA new version is available: %s (current: %s)\nUpdate:\n%s\n\n",
 			result.LatestVersion, currentVersion, InstallCommand())
 	}()
+}
+
+// asyncWG tracks in-flight async version checks so the process can wait briefly
+// for them before exiting (otherwise fast commands like `list` terminate before
+// the goroutine finishes its network fetch).
+var asyncWG sync.WaitGroup
+
+// WaitAsync blocks up to timeout for any pending async version check to finish.
+// It should be called from main() after Execute() returns, so a quick command
+// still gets a chance to print the update notice without holding up long commands.
+func WaitAsync(timeout time.Duration) {
+	done := make(chan struct{})
+	go func() {
+		asyncWG.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(timeout):
+	}
 }
 
 // CheckSync runs the version check synchronously and returns the result.
