@@ -6,10 +6,10 @@ const sidebar = [
   {
     text: "开始使用",
     items: [
-      { text: "创建并托管隧道", link: "/" },
       { text: "什么是开发隧道", link: "/guide/overview" },
       { text: "安装 DevBridge CLI", link: "/guide/install" },
       { text: "登录与凭证", link: "/guide/authentication" },
+      { text: "创建并托管隧道", link: "/" },
     ],
   },
   {

@@ -9,14 +9,6 @@ description: 安装 DevBridge CLI，登录并通过开发隧道托管本地服�
 
 在本快速入门中，你将安装并登录 DevBridge CLI，托管本机的 `8080` 端口，然后从另一台设备连接隧道。
 
-## 视频介绍
-
-<VideoPlayer
-  src="https://tools-artifact.developer.huaweicloud.com/sharedata/devbridge/video/promotion-video.mp4"
-  poster="/images/videos/promotion-video.png"
-  title="DevBridge 推广视频"
-/>
-
 ## 准备工作
 
 开始前，请确保：
