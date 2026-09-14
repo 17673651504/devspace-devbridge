@@ -16,19 +16,6 @@ import (
 	"github.com/microsoft/dev-tunnels-ssh/src/go/tcp"
 )
 
-// ──────────────────────────────────────────────────────────────
-// Connect — 连接远程服务
-//
-// Connect 运行在访问设备，连接同一条隧道，在本地建立端口映射。
-// 连接建立后，通过 localhost:port 即可访问远端 Host 托管的服务。
-//
-// 工作流程：
-//  1. WebSocket 连到 wss://<tunnelId>.<gatewayHost>/
-//  2. 在 WebSocket 上建立 SSH 客户端会话
-//  3. SSH 端口转发服务在本地创建 TCP listener
-//  4. 远端 Host 的流量通过 SSH 隧道转到本地 listener
-// ──────────────────────────────────────────────────────────────
-
 // ConnectConfig Connect 连接配置
 type ConnectConfig struct {
 	TunnelID string // 隧道 ID
@@ -49,31 +36,9 @@ type Forwarding struct {
 	LocalIP    string // 本地监听地址
 }
 
-// Connect 启动 Connect 连接服务
+// Connect 启动 Connect 连接服务。
 //
-// 这是一个阻塞方法，在 ctx 被取消或连接彻底断开时返回。
-// 网络短暂中断会自动重连。
-//
-// 基本用法：
-//
-//	err := client.Connect(ctx, devbridge.ConnectConfig{
-//	    TunnelID: "aaaadysa",
-//	    Ports:    []int{8080},
-//	})
-//
-// 使用 API Key 鉴权：
-//
-//	err := client.Connect(ctx, devbridge.ConnectConfig{
-//	    TunnelID: "aaaadysa",
-//	    APIKey:   "your-api-key",
-//	})
-//
-// 使用已有 JWT 令牌：
-//
-//	err := client.Connect(ctx, devbridge.ConnectConfig{
-//	    TunnelID: "aaaadysa",
-//	    JWTToken: "your-jwt-token",
-//	})
+// 这是一个阻塞方法，在 ctx 被取消或连接彻底断开时返回；网络短暂中断会自动重连。
 func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 	if err := validateTunnelID(cfg.TunnelID); err != nil {
 		return err
@@ -139,7 +104,6 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 	return nil
 }
 
-// runConnectSession 执行一次 Connect 会话
 func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, factory *listenerFactory, onReady func([]Forwarding)) (connected bool, err error) {
 	netConn, err := c.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
 	if err != nil {
@@ -183,7 +147,6 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 		c.statusln("Mode: passive forwarding (ports from host via SSH)")
 	}
 
-	// 等待转发建立
 	if len(realPorts) > 0 {
 		factory.waitForForwardings(3 * time.Second)
 	} else {
@@ -204,11 +167,6 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 		return true, nil
 	}
 }
-
-// ──────────────────────────────────────────────────────────────
-// listenerFactory — 创建本地 TCP listener 的工厂
-// 实现 tcp.ListenerFactory 接口，在本地端口被占用时自动换随机端口
-// ──────────────────────────────────────────────────────────────
 
 type listenerFactory struct {
 	mu                 sync.Mutex

@@ -14,19 +14,6 @@ import (
 	"github.com/microsoft/dev-tunnels-ssh/src/go/tcp"
 )
 
-// ──────────────────────────────────────────────────────────────
-// Host — 托管本地服务
-//
-// Host 运行在服务所在设备，通过 WebSocket 出站连接到 DevBridge 中继，
-// 把本地端口转发出去，让远端 Connect 可以访问。
-//
-// 工作流程：
-//  1. WebSocket 连到 wss://<tunnelId>.<gatewayHost>/<tunnelId>
-//  2. 在 WebSocket 上建立 SSH 会话
-//  3. 接受 relay channel，为每个 channel 创建内层 SSH 会话
-//  4. 通过端口转发把流量从远端转到本地端口
-// ──────────────────────────────────────────────────────────────
-
 // HostConfig Host 托管配置
 type HostConfig struct {
 	TunnelID string // 隧道 ID
@@ -41,12 +28,11 @@ type HostConfig struct {
 
 // HostResult Host 运行结果信息
 type HostResult struct {
-	TunnelID  string // 隧道 ID
-	Ports     []int  // 实际托管的端口
-	TunnelURL string // 隧道访问地址
+	TunnelID  string
+	Ports     []int
+	TunnelURL string
 }
 
-// relayPortMessage 网关下发的端口通知
 type relayPortMessage struct {
 	Ports []uint16 `json:"ports"`
 }
@@ -64,31 +50,15 @@ func init() {
 	}
 }
 
-// Host 启动 Host 托管服务
+// Host 启动 Host 托管服务。
 //
-// 这是一个阻塞方法，在 ctx 被取消或连接彻底断开时返回。
-// 网络短暂中断会自动重连。
+// 这是一个阻塞方法，在 ctx 被取消或连接彻底断开时返回；网络短暂中断会自动重连。
 //
-// 基本用法（已有隧道和端口配置）：
-//
-//	err := client.Host(ctx, devbridge.HostConfig{
-//	    TunnelID: "aaaadysa",
-//	    Ports:    []int{8080},
-//	})
-//
-// 使用 API Key 鉴权（跳过令牌签发）：
-//
-//	err := client.Host(ctx, devbridge.HostConfig{
-//	    TunnelID: "aaaadysa",
-//	    APIKey:   "your-api-key",
-//	})
-//
-// 使用已有 JWT 令牌（跳过 API 调用）：
-//
-//	err := client.Host(ctx, devbridge.HostConfig{
-//	    TunnelID: "aaaadysa",
-//	    JWTToken: "your-jwt-token",
-//	})
+// 工作流程：
+//  1. WebSocket 连到 wss://<tunnelId>.<gatewayHost>/<tunnelId>
+//  2. 在 WebSocket 上建立 SSH 会话
+//  3. 接受 relay channel，为每个 channel 创建内层 SSH 会话
+//  4. 通过端口转发把流量从远端转到本地端口
 func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 	if err := validateTunnelID(cfg.TunnelID); err != nil {
 		return err
@@ -158,7 +128,6 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 	return nil
 }
 
-// runHostSession 执行一次 Host 会话
 func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, onReady func([]int)) (connected bool, err error) {
 	netConn, err := c.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
 	if err != nil {
@@ -166,7 +135,6 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 	}
 	defer func() { _ = netConn.Close() }()
 
-	// 建立 SSH 客户端会话
 	outerConfig := ssh.NewNoSecurityConfig()
 	outerConfig.KeepAliveIntervalSeconds = 10
 	outerConfig.KeyRotationThreshold = 0
@@ -196,13 +164,10 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 		}
 	}
 
-	// 端口通知
 	pn := newPortNotifier()
 
-	// 接受 channel 循环
 	go c.startHostAcceptLoop(ctx, outerSession, tunnelID, ports, pn)
 
-	// 等待端口通知（如果端口由网关下发）
 	if len(ports) == 0 {
 		select {
 		case <-pn.ready:
@@ -215,7 +180,6 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 		}
 	}
 
-	// 打印就绪信息（用户可见输出，带颜色）
 	printPorts := ports
 	if len(ports) == 0 {
 		printPorts = pn.ports
@@ -241,7 +205,6 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 		onReady(realPorts)
 	}
 
-	// 等待断开
 	for {
 		select {
 		case <-disconnected:
@@ -254,7 +217,6 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 	}
 }
 
-// portNotifier 端口通知器
 type portNotifier struct {
 	ready    chan struct{}
 	ports    []int
@@ -265,7 +227,6 @@ func newPortNotifier() *portNotifier {
 	return &portNotifier{ready: make(chan struct{})}
 }
 
-// startHostAcceptLoop 接受 SSH channel 的循环
 func (c *Client) startHostAcceptLoop(ctx context.Context, outerSession *ssh.ClientSession, tunnelID string, ports []int, pn *portNotifier) {
 	for {
 		channel, err := outerSession.AcceptChannel(ctx)
@@ -298,7 +259,6 @@ func (c *Client) startHostAcceptLoop(ctx context.Context, outerSession *ssh.Clie
 	}
 }
 
-// readPortNotification 从 channel 读取端口通知
 func readPortNotification(channel *ssh.Channel) []int {
 	stream := ssh.NewStream(channel)
 	buf := make([]byte, 4096)
@@ -317,9 +277,7 @@ func readPortNotification(channel *ssh.Channel) []int {
 	return ports
 }
 
-// handleRelayChannel 处理一个 relay channel
 func (c *Client) handleRelayChannel(ctx context.Context, channel *ssh.Channel, tunnelID string, ports []int) {
-	// 创建内层 SSH 服务端会话
 	innerConfig := ssh.NewNoSecurityConfig()
 	tcp.AddPortForwardingService(innerConfig)
 	innerSession := ssh.NewServerSession(innerConfig)
@@ -333,7 +291,6 @@ func (c *Client) handleRelayChannel(ctx context.Context, channel *ssh.Channel, t
 	c.logger.Debug("host: inner SSH server session established", "channelID", channel.ChannelID)
 	hostSessionLookup[channel.ChannelID] = innerSession
 
-	// 设置端口转发
 	pfs := tcp.GetPortForwardingService(&innerSession.Session)
 	if pfs != nil && len(ports) > 0 {
 		// 过滤"所有端口"哨兵值（-1），不被转发（不是合法监听端口）。
@@ -344,7 +301,6 @@ func (c *Client) handleRelayChannel(ctx context.Context, channel *ssh.Channel, t
 		}
 	}
 
-	// 清理
 	go func(chID uint32) {
 		for {
 			if _, err := innerSession.AcceptChannel(ctx); err != nil {

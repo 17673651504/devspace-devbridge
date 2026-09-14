@@ -5,14 +5,7 @@ import (
 	"fmt"
 )
 
-// ──────────────────────────────────────────────────────────────
-// 端口 API — Create / List / Show / Update / Delete
-// ──────────────────────────────────────────────────────────────
-
 // CreatePort 在隧道上创建端口
-//
-//	allowAnon := true
-//	client.CreatePort(ctx, "tunnelId", 8080, "http", &allowAnon)
 func (c *Client) CreatePort(ctx context.Context, tunnelID string, port int, protocol string, allowAnonymous *bool) error {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return err
@@ -59,11 +52,7 @@ func (c *Client) ShowPort(ctx context.Context, tunnelID string, port int) (*Port
 	return &result, nil
 }
 
-// UpdatePort 更新端口的匿名访问策略
-//
-//	allowAnon := false
-//	client.UpdatePort(ctx, "tunnelId", 8080, &allowAnon)  // 禁止匿名访问
-//	client.UpdatePort(ctx, "tunnelId", 8080, nil)          // 不修改
+// UpdatePort 更新端口的匿名访问策略，allowAnonymous 为 nil 时不修改
 func (c *Client) UpdatePort(ctx context.Context, tunnelID string, port int, allowAnonymous *bool) error {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return err

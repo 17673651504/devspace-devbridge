@@ -5,15 +5,7 @@ import (
 	"fmt"
 )
 
-// ──────────────────────────────────────────────────────────────
-// 隧道 API — Create / List / Show / Update / Delete / DeleteAll
-// ──────────────────────────────────────────────────────────────
-
-// CreateTunnel 创建隧道
-//
-//	client.CreateTunnel(ctx, "my-tunnel", "描述", nil)  // 默认有效期 72h
-//	exp := 24
-//	client.CreateTunnel(ctx, "my-tunnel", "", &exp)     // 24h
+// CreateTunnel 创建隧道，expiration 为 nil 时使用默认有效期 72 小时
 func (c *Client) CreateTunnel(ctx context.Context, name, description string, expiration *int) (*Tunnel, error) {
 	if !tunnelNameRegexp.MatchString(name) {
 		return nil, fmt.Errorf("invalid tunnel name: %q", name)
@@ -62,13 +54,7 @@ func (c *Client) ShowTunnel(ctx context.Context, tunnelID string) (*TunnelDetail
 	return &result, nil
 }
 
-// UpdateTunnel 更新隧道
-//
-// 只传需要修改的字段，nil 表示不修改：
-//
-//	name := "new-name"
-//	desc := "new-desc"
-//	client.UpdateTunnel(ctx, "tunnelId", &name, &desc, nil)  // 改名称和描述，不改有效期
+// UpdateTunnel 更新隧道。只传需要修改的字段，nil 表示不修改
 func (c *Client) UpdateTunnel(ctx context.Context, tunnelID string, name, description *string, expiration *int) error {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return err
@@ -112,12 +98,7 @@ func (c *Client) DeleteAllTunnels(ctx context.Context) error {
 	return c.delete(ctx, "/tunnels", nil)
 }
 
-// IssueToken 签发隧道令牌
-//
-//	scope 必须是 "host" 或 "connect"：
-//
-//	token, _ := client.IssueToken(ctx, "tunnelId", "host")    // Host 令牌
-//	token, _ := client.IssueToken(ctx, "tunnelId", "connect") // Connect 令牌
+// IssueToken 签发隧道令牌，scope 必须是 "host" 或 "connect"
 func (c *Client) IssueToken(ctx context.Context, tunnelID, scope string) (*TunnelToken, error) {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return nil, err

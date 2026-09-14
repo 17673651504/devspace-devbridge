@@ -14,25 +14,11 @@ import (
 	"time"
 )
 
-// ──────────────────────────────────────────────────────────────
-// Client — SDK 主入口
-// 一个 Client 持有配置（API Key、服务地址），提供 REST API 方法和 Host/Connect 方法
-// ──────────────────────────────────────────────────────────────
-
-// 默认服务地址
 const (
-	// DefaultAPIBaseURL REST API 基础地址（与 CLI 生产环境对齐）
-	// 对应 cli/.goreleaser.yaml 中注入的 DefaultServerDomain + cli/internal/api/client.go 的路径后缀
-	DefaultAPIBaseURL = "https://bridge.developer.myhuaweicloud.com/open-api-inner/v1/relay-controller"
-
-	// DefaultGatewayAddr WebSocket 网关地址
+	DefaultAPIBaseURL  = "https://bridge.developer.myhuaweicloud.com/open-api-inner/v1/relay-controller"
 	DefaultGatewayAddr = "gateway.cn-north-4-bridge.myhuaweicloud.com:443"
-
-	// DefaultGatewayHost WebSocket 网关 SNI host
 	DefaultGatewayHost = "cn-north-4-bridge.myhuaweicloud.com"
-
-	// DefaultClusterID 默认集群
-	DefaultClusterID = "cn-north-4-bridge"
+	DefaultClusterID   = "cn-north-4-bridge"
 )
 
 var (
@@ -106,47 +92,30 @@ func (cfg Config) resolve() Config {
 
 // Client DevBridge SDK 客户端
 type Client struct {
-	apiKey      string       // API Key，用于 REST API 认证
-	apiBaseURL  string       // REST API 基础地址
-	gatewayAddr string       // WebSocket 网关地址（host:port）
-	gatewayHost string       // WebSocket 网关 SNI host
-	httpClient  *http.Client // HTTP 客户端
-	logger      *slog.Logger // 日志
-
-	statusWriter io.Writer // 用户可见状态输出（连接进度、端口映射等），默认 os.Stdout
+	apiKey       string
+	apiBaseURL   string
+	gatewayAddr  string
+	gatewayHost  string
+	httpClient   *http.Client
+	logger       *slog.Logger
+	statusWriter io.Writer
 }
 
 // NewClient creates a new SDK client from the given Config.
 // A zero Config is valid; APIKey falls back to HW_API_KEY env var,
 // and other fields fall back to sensible defaults.
-//
-// 最少只需要 API Key：
-//
-//	client, err := devbridge.NewClient(devbridge.Config{
-//	    APIKey: "your-api-key",
-//	})
-//
-// 也会自动读取 HW_API_KEY 环境变量：
-//
-//	os.Setenv("HW_API_KEY", "your-key")
-//	client, err := devbridge.NewClient(devbridge.Config{})
 func NewClient(cfg Config) (*Client, error) {
 	resolved := cfg.resolve()
 	return &Client{
-		apiKey:      resolved.APIKey,
-		apiBaseURL:  resolved.APIBaseURL,
-		gatewayAddr: resolved.GatewayAddr,
-		gatewayHost: resolved.GatewayHost,
-		httpClient:  resolved.HTTPClient,
-		logger:      slog.Default(),
-
+		apiKey:       resolved.APIKey,
+		apiBaseURL:   resolved.APIBaseURL,
+		gatewayAddr:  resolved.GatewayAddr,
+		gatewayHost:  resolved.GatewayHost,
+		httpClient:   resolved.HTTPClient,
+		logger:       slog.Default(),
 		statusWriter: resolved.StatusWriter,
 	}, nil
 }
-
-// ──────────────────────────────────────────────────────────────
-// 内部 HTTP 请求方法
-// ──────────────────────────────────────────────────────────────
 
 const (
 	headerXAPIKey     = "X-API-Key"
@@ -161,12 +130,10 @@ func (c *Client) resolveAPIKey() (string, error) {
 	return c.apiKey, nil
 }
 
-// isDebugEnabled 检查当前 logger 是否启用了 Debug 级别
 func (c *Client) isDebugEnabled() bool {
 	return c.logger.Enabled(context.Background(), slog.LevelDebug)
 }
 
-// logHTTPRequest 记录 HTTP 请求日志（Debug 级别）
 func (c *Client) logHTTPRequest(req *http.Request, body []byte) {
 	if !c.isDebugEnabled() {
 		return
@@ -181,7 +148,6 @@ func (c *Client) logHTTPRequest(req *http.Request, body []byte) {
 	c.logger.LogAttrs(context.Background(), slog.LevelDebug, "HTTP request", attrs...)
 }
 
-// logHTTPResponse 记录 HTTP 响应日志（Debug 级别）
 func (c *Client) logHTTPResponse(resp *http.Response, body []byte, elapsed time.Duration) {
 	if !c.isDebugEnabled() {
 		return
@@ -200,17 +166,14 @@ func (c *Client) logHTTPResponse(resp *http.Response, body []byte, elapsed time.
 	}
 }
 
-// statusf 将用户可见的状态行写到 StatusWriter（默认 os.Stdout）
 func (c *Client) statusf(format string, args ...any) {
 	fmt.Fprintf(c.statusWriter, format, args...)
 }
 
-// statusln 将用户可见的状态行写到 StatusWriter（默认 os.Stdout）
 func (c *Client) statusln(args ...any) {
 	fmt.Fprintln(c.statusWriter, args...)
 }
 
-// doRequest 发送 HTTP 请求并处理响应
 func (c *Client) doRequest(ctx context.Context, method, path string, body any, result any) error {
 	apiKey, err := c.resolveAPIKey()
 	if err != nil {
@@ -253,7 +216,6 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 
 	c.logHTTPResponse(resp, respBody, time.Since(start))
 
-	// 处理 HTTP 错误状态码
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		if apiErr := parseAPIError(respBody); apiErr != nil {
 			return apiErr
@@ -261,7 +223,6 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 		return fmt.Errorf("server error: HTTP %d: %s", resp.StatusCode, string(respBody))
 	}
 
-	// 解析响应
 	if result != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, result); err != nil {
 			return fmt.Errorf("unmarshal response: %w", err)
@@ -270,9 +231,8 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any, r
 	return nil
 }
 
-// parseAPIError 从响应体解析错误
+// parseAPIError 尝试从响应体解析 {error: {code, message}} 格式的业务错误。
 func parseAPIError(body []byte) *APIError {
-	// 尝试 {error: {code, message}} 格式
 	var eb errorBody
 	if json.Unmarshal(body, &eb) == nil && eb.Error.Code != "" {
 		return &APIError{Code: eb.Error.Code, Message: eb.Error.Message}
@@ -296,10 +256,6 @@ func (c *Client) delete(ctx context.Context, path string, result any) error {
 	return c.doRequest(ctx, http.MethodDelete, path, nil, result)
 }
 
-// ──────────────────────────────────────────────────────────────
-// 校验方法
-// ──────────────────────────────────────────────────────────────
-
 func validateTunnelID(id string) error {
 	if !tunnelIDRegexp.MatchString(id) {
 		return fmt.Errorf("%w: got %q", ErrInvalidTunnelID, id)
@@ -316,7 +272,7 @@ func validateTunnelDescription(description string) error {
 
 func validatePortNumber(port int) error {
 	if port == AllPortsSentinel {
-		return nil // -1 means all ports
+		return nil
 	}
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("%w: got %d", ErrInvalidPort, port)

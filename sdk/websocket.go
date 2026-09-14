@@ -17,10 +17,6 @@ import (
 	"github.com/microsoft/dev-tunnels-ssh/src/go/ssh"
 )
 
-// ──────────────────────────────────────────────────────────────
-// WebSocket 连接逻辑 — Host 和 Connect 共用
-// ──────────────────────────────────────────────────────────────
-
 const (
 	subprotocolDevBridge = "devbridge-v1"
 	relayChannelType     = "relay"
