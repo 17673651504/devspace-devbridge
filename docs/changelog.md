@@ -1,3 +1,8 @@
+---
+title: 更新日志
+description: DevBridge 文档站点的变更内容。
+---
+
 # 更新日志
 
 本文件记录 DevBridge 文档站点的变更内容。
