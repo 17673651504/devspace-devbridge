@@ -5,7 +5,7 @@
 package sdk
 
 import (
-	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
+	devbridge "github.com/17673651504/devspace-devbridge/sdk"
 	"huawei.com/devbridge/internal/auth"
 	"huawei.com/devbridge/internal/config"
 )

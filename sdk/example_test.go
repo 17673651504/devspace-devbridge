@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/huaweicloud/devspace-devbridge/sdk"
+	"github.com/17673651504/devspace-devbridge/sdk"
 )
 
 // ──────────────────────────────────────────────────────────────

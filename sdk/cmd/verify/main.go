@@ -38,7 +38,7 @@ import (
 	"syscall"
 	"time"
 
-	sdk "github.com/huaweicloud/devspace-devbridge/sdk"
+	sdk "github.com/17673651504/devspace-devbridge/sdk"
 )
 
 func main() {
