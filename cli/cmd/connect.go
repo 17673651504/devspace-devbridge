@@ -24,6 +24,9 @@ var hostToken string
 var hostAPIKey string
 var connectAPIKey string
 
+// tunnelIDPatternConnect validates tunnel IDs for host/connect commands.
+// Suffix "Connect" avoids collision with tunnelIDPattern in tunnel.go,
+// which uses a stricter regex (^[a-z2-7]{8}$) for tunnel CRUD operations.
 var tunnelIDPatternConnect = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 
 func validateTunnelIDConnect(id string) error {

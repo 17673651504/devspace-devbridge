@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -26,8 +25,8 @@ const (
 )
 
 var (
-	// 宽松匹配版本号：支持 v0.1.9 / 0.1.9 / 0.1.13.333 / 0.1.3-release / 0.1.3.release 等。
-	// 只解析开头的数字段（major.minor.patch[.build]），忽略任意后缀。
+	// Loose version matching: supports v0.1.9 / 0.1.9 / 0.1.13.333 / 0.1.3-release / 0.1.3.release etc.
+	// Only parses the leading numeric segments (major.minor.patch[.build]), ignoring any suffix.
 	versionRegex = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?`)
 )
 
@@ -36,7 +35,6 @@ type CheckResult struct {
 	LatestVersion string `json:"latestVersion"`
 	LatestTag     string `json:"latestTag"`
 	CheckedAt     int64  `json:"checkedAt"`
-	LastNotifyAt  int64  `json:"lastNotifyAt"` // last time async notice was printed
 }
 
 // gitcodeRelease represents a single release from the GitCode API.
@@ -45,8 +43,9 @@ type gitcodeRelease struct {
 }
 
 // IsNewer compares current version with latest. Returns true if latest > current.
-// 版本号可以是 "0.1.9"、"0.1.13.333"（四段 build 号）、"0.1.3-release"、"0.1.3.release"，
-// 只比较开头的主版本/次版本/修订号/构建号，后缀被忽略。
+// Version strings can be "0.1.9", "0.1.13.333" (four-segment build number),
+// "0.1.3-release", "0.1.3.release" — only the leading major.minor.patch[.build]
+// segments are compared; suffixes are ignored.
 func IsNewer(current, latest string) bool {
 	return isNewerRaw(current, latest)
 }
@@ -65,8 +64,9 @@ func parseVersion(v string) (major, minor, patch, build int, ok bool) {
 	return major, minor, patch, build, true
 }
 
-// versionFromTag 从 tag 中提取规范化的数字版本号（如 "0.2.0-release" → "0.2.0"，
-// "0.1.13.333" → "0.1.13.333"），忽略后缀。非版本 tag（如 "latest"、"test-*"）返回 !ok。
+// versionFromTag extracts a normalized numeric version from a tag (e.g.
+// "0.2.0-release" → "0.2.0", "0.1.13.333" → "0.1.13.333"), ignoring suffixes.
+// Non-version tags (e.g. "latest", "test-*") return !ok.
 func versionFromTag(s string) (string, bool) {
 	m := versionRegex.FindStringSubmatch(s)
 	if m == nil {
@@ -208,53 +208,8 @@ func Check(currentVersion string) *CheckResult {
 	return result
 }
 
-// CheckAsync runs the version check in a goroutine and prints a notice if a new version is available.
-// It should be called from PersistentPreRun — it does not block command execution.
-// The async notice is printed at most once per day.
-func CheckAsync(currentVersion string) {
-	asyncWG.Add(1)
-	go func() {
-		defer asyncWG.Done()
-		result := Check(currentVersion)
-		if result == nil {
-			return
-		}
-		if !IsNewer(currentVersion, result.LatestVersion) {
-			return
-		}
-		// Rate-limit async notice to once per day
-		if result.LastNotifyAt > 0 && time.Since(time.Unix(result.LastNotifyAt, 0)) < 24*time.Hour {
-			return
-		}
-		result.LastNotifyAt = time.Now().Unix()
-		saveCache(result)
-		fmt.Fprintf(os.Stderr, "\nA new version is available: %s (current: %s)\nUpdate:\n%s\n\n",
-			result.LatestVersion, currentVersion, InstallCommand())
-	}()
-}
-
-// asyncWG tracks in-flight async version checks so the process can wait briefly
-// for them before exiting (otherwise fast commands like `list` terminate before
-// the goroutine finishes its network fetch).
-var asyncWG sync.WaitGroup
-
-// WaitAsync blocks up to timeout for any pending async version check to finish.
-// It should be called from main() after Execute() returns, so a quick command
-// still gets a chance to print the update notice without holding up long commands.
-func WaitAsync(timeout time.Duration) {
-	done := make(chan struct{})
-	go func() {
-		asyncWG.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(timeout):
-	}
-}
-
 // CheckSync runs the version check synchronously and returns the result.
-// Used by the `version` command.
+// Used by the `version` command and PersistentPreRun.
 func CheckSync(currentVersion string) *CheckResult {
 	return Check(currentVersion)
 }
