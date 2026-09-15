@@ -1,4 +1,4 @@
-package devbridge
+package sdk
 
 import (
 	"context"
@@ -39,7 +39,7 @@ type Forwarding struct {
 // Connect 启动 Connect 连接服务。
 //
 // 这是一个阻塞方法，在 ctx 被取消或连接彻底断开时返回；网络短暂中断会自动重连。
-func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
+func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 	if err := validateTunnelID(cfg.TunnelID); err != nil {
 		return err
 	}
@@ -47,17 +47,17 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 		cfg.LocalIP = "127.0.0.1"
 	}
 
-	// 认证回退：cfg 未显式指定时，使用 Client 级别的 API Key
+	// 认证回退：cfg 未显式指定时，使用 Devbridge 实例上的 API Key
 	apiKey := cfg.APIKey
 	if apiKey == "" && cfg.JWTToken == "" {
-		apiKey = c.apiKey
+		apiKey = d.apiKey
 	}
 
 	header, subprotocols := buildWSHeader(cfg.JWTToken, apiKey)
-	sniHost := cfg.TunnelID + "." + c.gatewayHost
+	sniHost := cfg.TunnelID + "." + d.gatewayHost
 	wsURL := "wss://" + sniHost + "/"
 
-	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, c.statusWriter, c.logger)
+	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, d.statusWriter, d.logger)
 
 	const maxReconnectAttempts = 5
 	const baseReconnectDelay = 3 * time.Second
@@ -65,7 +65,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 
 	consecutiveFailures := 0
 	for consecutiveFailures < maxReconnectAttempts {
-		connected, err := c.runConnectSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, factory, cfg.OnReady)
+		connected, err := d.runConnectSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, factory, cfg.OnReady)
 		if ctx.Err() != nil {
 			return nil
 		}
@@ -73,7 +73,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 			return nil
 		}
 		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
-			c.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
+			d.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
 			return nil
 		}
 		if connected {
@@ -82,7 +82,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 			consecutiveFailures++
 		}
 		if consecutiveFailures >= maxReconnectAttempts {
-			c.logger.Error("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
+			d.logger.Error("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
 			return nil
 		}
 
@@ -94,7 +94,7 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 				break
 			}
 		}
-		c.statusf("Connection lost, reconnecting... (%v)\n", err)
+		d.statusf("Connection lost, reconnecting... (%v)\n", err)
 		select {
 		case <-ctx.Done():
 			return nil
@@ -104,8 +104,8 @@ func (c *Client) Connect(ctx context.Context, cfg ConnectConfig) error {
 	return nil
 }
 
-func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, factory *listenerFactory, onReady func([]Forwarding)) (connected bool, err error) {
-	netConn, err := c.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
+func (d *Devbridge) runConnectSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, factory *listenerFactory, onReady func([]Forwarding)) (connected bool, err error) {
+	netConn, err := d.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
 	if err != nil {
 		return false, fmt.Errorf("WebSocket connection failed: %w", err)
 	}
@@ -115,7 +115,7 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 	tcp.AddPortForwardingService(config)
 
 	session := ssh.NewClientSession(config)
-	session.Trace = sshTraceFunc(c.logger)
+	session.Trace = sshTraceFunc(d.logger)
 	defer func() { _ = session.Close() }()
 
 	pfs := tcp.GetPortForwardingService(&session.Session)
@@ -133,18 +133,18 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 	}
 	connected = true
 
-	c.statusf("Connected to tunnel: %s\n", tunnelID)
+	d.statusf("Connected to tunnel: %s\n", tunnelID)
 
 	// 过滤"所有端口"哨兵值（-1）。这种隧道只能通过 URL 访问任意端口，
 	// connect 端无需为 -1 建立本地监听。
 	realPorts := filterForwardPorts(ports)
 
 	if len(realPorts) > 0 {
-		c.statusln("Mode: active forwarding (ports from API)")
+		d.statusln("Mode: active forwarding (ports from API)")
 	} else if len(ports) > 0 {
-		c.statusf("All ports mode: access via URL instead, e.g. https://%s-<port>.%s\n", tunnelID, c.gatewayHost)
+		d.statusf("All ports mode: access via URL instead, e.g. https://%s-<port>.%s\n", tunnelID, d.gatewayHost)
 	} else {
-		c.statusln("Mode: passive forwarding (ports from host via SSH)")
+		d.statusln("Mode: passive forwarding (ports from host via SSH)")
 	}
 
 	if len(realPorts) > 0 {
@@ -154,7 +154,7 @@ func (c *Client) runConnectSession(ctx context.Context, wsURL string, sniHost st
 	}
 	factory.printForwardings()
 
-	c.statusln("Auto reconnect: enabled")
+	d.statusln("Auto reconnect: enabled")
 
 	if onReady != nil {
 		onReady(factory.snapshotForwardings())

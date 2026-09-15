@@ -1,8 +1,9 @@
-package devbridge
+package sdk
 
 import (
 	"errors"
-	"fmt"
+
+	"github.com/huaweicloud/devspace-devbridge/sdk/internal/httpclient"
 )
 
 var ErrMissingAPIKey = errors.New("missing API key: set it via Config.APIKey or HW_API_KEY env var")
@@ -24,14 +25,7 @@ var ErrInvalidProtocol = errors.New("invalid protocol: must be http, https, or a
 var ErrInvalidScope = errors.New("invalid token scope: must be host or connect")
 
 // APIError 表示服务端返回的业务错误
-type APIError struct {
-	Code    string // 错误码，如 "HD.98320078"
-	Message string // 错误描述
-}
-
-func (e *APIError) Error() string {
-	return fmt.Sprintf("error code: %s, error message: %s", e.Code, e.Message)
-}
+type APIError = httpclient.APIError
 
 // IsAPIError 判断 error 是否为 APIError，并返回错误码
 func IsAPIError(err error) (code string, ok bool) {

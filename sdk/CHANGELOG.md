@@ -2,6 +2,16 @@
 
 本文件记录 DevBridge Go SDK 的用户可见变更，版本遵循语义化版本（SemVer）。
 
+## Unreleased
+
+### Changed（Breaking）
+
+- 包结构重构：
+  - 包名 `devbridge` → `sdk`（与模块路径末段一致）
+  - 业务对象 `Client` 更名 `Devbridge`，构造函数 `NewClient` → `New`
+  - HTTP 通信实现下沉至 `internal/httpclient`（外部不可导入）
+- 迁移方式：将 `devbridge.` 前缀替换为 `sdk.`，`NewClient(...)` 替换为 `New(...)`
+
 ## v0.1.0（2026-09-14）
 
 首个公开发布版本。

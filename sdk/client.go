@@ -1,24 +1,23 @@
-package devbridge
+// Package sdk 提供 DevBridge 隧道服务的 Go 客户端：
+// 隧道与端口的 REST API 管理，以及 Host 托管与 Connect 连接能力。
+package sdk
 
 import (
-	"bytes"
-	"context"
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"regexp"
-	"time"
+
+	"github.com/huaweicloud/devspace-devbridge/sdk/internal/httpclient"
 )
 
 const (
 	DefaultAPIBaseURL  = "https://bridge.developer.myhuaweicloud.com/open-api-inner/v1/relay-controller"
-	DefaultGatewayAddr = "gateway.devbridge-s2.hwtunnel.com:443"
-	DefaultGatewayHost = "devbridge-s2.hwtunnel.com"
-	DefaultClusterID   = "devbridge-s2"
+	DefaultGatewayAddr = "gateway.cn-north-4-bridge.myhuaweicloud.com:443"
+	DefaultGatewayHost = "cn-north-4-bridge.myhuaweicloud.com"
+	DefaultClusterID   = "cn-north-4-bridge"
 )
 
 var (
@@ -51,8 +50,8 @@ type Config struct {
 	// Defaults to DefaultGatewayHost.
 	GatewayHost string
 
-	// HTTPClient optionally overrides the HTTP client.
-	// If nil, a default client with 30s timeout is used.
+	// HTTPClient optionally overrides the HTTP client used for REST API
+	// requests. If nil, a default client with 30s timeout is used.
 	HTTPClient *http.Client
 
 	// StatusWriter receives user-facing status lines (connection progress,
@@ -79,181 +78,40 @@ func (cfg Config) resolve() Config {
 	if out.StatusWriter == nil {
 		out.StatusWriter = os.Stdout
 	}
-	if out.HTTPClient == nil {
-		out.HTTPClient = &http.Client{
-			Timeout: 30 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-		}
-	}
 	return out
 }
 
-// Client DevBridge SDK 客户端
-type Client struct {
+// Devbridge DevBridge SDK 客户端
+type Devbridge struct {
 	apiKey       string
-	apiBaseURL   string
 	gatewayAddr  string
 	gatewayHost  string
-	httpClient   *http.Client
 	logger       *slog.Logger
 	statusWriter io.Writer
+	api          *httpclient.Client
 }
 
-// NewClient creates a new SDK client from the given Config.
+// New creates a new SDK client from the given Config.
 // A zero Config is valid; APIKey falls back to HW_API_KEY env var,
 // and other fields fall back to sensible defaults.
-func NewClient(cfg Config) (*Client, error) {
+func New(cfg Config) (*Devbridge, error) {
 	resolved := cfg.resolve()
-	return &Client{
+	return &Devbridge{
 		apiKey:       resolved.APIKey,
-		apiBaseURL:   resolved.APIBaseURL,
 		gatewayAddr:  resolved.GatewayAddr,
 		gatewayHost:  resolved.GatewayHost,
-		httpClient:   resolved.HTTPClient,
 		logger:       slog.Default(),
 		statusWriter: resolved.StatusWriter,
+		api:          httpclient.New(resolved.APIKey, resolved.APIBaseURL, resolved.HTTPClient, slog.Default()),
 	}, nil
 }
 
-const (
-	headerXAPIKey     = "X-API-Key"
-	headerContentType = "content-type"
-	headerJSON        = "application/json"
-)
-
-func (c *Client) resolveAPIKey() (string, error) {
-	if c.apiKey == "" {
-		return "", ErrMissingAPIKey
-	}
-	return c.apiKey, nil
+func (d *Devbridge) statusf(format string, args ...any) {
+	fmt.Fprintf(d.statusWriter, format, args...)
 }
 
-func (c *Client) isDebugEnabled() bool {
-	return c.logger.Enabled(context.Background(), slog.LevelDebug)
-}
-
-func (c *Client) logHTTPRequest(req *http.Request, body []byte) {
-	if !c.isDebugEnabled() {
-		return
-	}
-	attrs := []slog.Attr{
-		slog.String("method", req.Method),
-		slog.String("url", req.URL.String()),
-	}
-	if len(body) > 0 {
-		attrs = append(attrs, slog.String("body", string(body)))
-	}
-	c.logger.LogAttrs(context.Background(), slog.LevelDebug, "HTTP request", attrs...)
-}
-
-func (c *Client) logHTTPResponse(resp *http.Response, body []byte, elapsed time.Duration) {
-	if !c.isDebugEnabled() {
-		return
-	}
-	attrs := []slog.Attr{
-		slog.Int("statusCode", resp.StatusCode),
-		slog.String("status", resp.Status),
-		slog.Int64("elapsed", elapsed.Milliseconds()),
-	}
-	c.logger.LogAttrs(context.Background(), slog.LevelDebug, "HTTP response", attrs...)
-	if len(body) > 0 {
-		c.logger.LogAttrs(context.Background(), slog.LevelDebug, "HTTP response body",
-			slog.String("data", string(body)),
-			slog.String("size", fmt.Sprintf("%d bytes total", len(body))),
-		)
-	}
-}
-
-func (c *Client) statusf(format string, args ...any) {
-	fmt.Fprintf(c.statusWriter, format, args...)
-}
-
-func (c *Client) statusln(args ...any) {
-	fmt.Fprintln(c.statusWriter, args...)
-}
-
-func (c *Client) doRequest(ctx context.Context, method, path string, body any, result any) error {
-	apiKey, err := c.resolveAPIKey()
-	if err != nil {
-		return err
-	}
-
-	url := c.apiBaseURL + path
-
-	var bodyBytes []byte
-	hasBody := method == http.MethodPost || method == http.MethodPut
-	if hasBody && body != nil {
-		bodyBytes, err = json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("marshal request body: %w", err)
-		}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set(headerXAPIKey, apiKey)
-	if hasBody {
-		req.Header.Set(headerContentType, headerJSON)
-	}
-
-	c.logHTTPRequest(req, bodyBytes)
-
-	start := time.Now()
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("http request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("read response: %w", err)
-	}
-
-	c.logHTTPResponse(resp, respBody, time.Since(start))
-
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		if apiErr := parseAPIError(respBody); apiErr != nil {
-			return apiErr
-		}
-		return fmt.Errorf("server error: HTTP %d: %s", resp.StatusCode, string(respBody))
-	}
-
-	if result != nil && len(respBody) > 0 {
-		if err := json.Unmarshal(respBody, result); err != nil {
-			return fmt.Errorf("unmarshal response: %w", err)
-		}
-	}
-	return nil
-}
-
-// parseAPIError 尝试从响应体解析 {error: {code, message}} 格式的业务错误。
-func parseAPIError(body []byte) *APIError {
-	var eb errorBody
-	if json.Unmarshal(body, &eb) == nil && eb.Error.Code != "" {
-		return &APIError{Code: eb.Error.Code, Message: eb.Error.Message}
-	}
-	return nil
-}
-
-func (c *Client) get(ctx context.Context, path string, result any) error {
-	return c.doRequest(ctx, http.MethodGet, path, nil, result)
-}
-
-func (c *Client) post(ctx context.Context, path string, body, result any) error {
-	return c.doRequest(ctx, http.MethodPost, path, body, result)
-}
-
-func (c *Client) put(ctx context.Context, path string, body, result any) error {
-	return c.doRequest(ctx, http.MethodPut, path, body, result)
-}
-
-func (c *Client) delete(ctx context.Context, path string, result any) error {
-	return c.doRequest(ctx, http.MethodDelete, path, nil, result)
+func (d *Devbridge) statusln(args ...any) {
+	fmt.Fprintln(d.statusWriter, args...)
 }
 
 func validateTunnelID(id string) error {

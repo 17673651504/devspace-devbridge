@@ -14,7 +14,7 @@ import (
 //
 // Read order: override API Key → env var → keyring/config storage.
 // API base URL and gateway address come from CLI config and ldflags-injected values.
-func NewClient() (*devbridge.Client, error) {
+func NewClient() (*devbridge.Devbridge, error) {
 	cfg := devbridge.Config{
 		APIBaseURL:  config.DefaultServerDomain + "/open-api-inner/v1/relay-controller",
 		GatewayAddr: config.ResolveGatewayAddr(),
@@ -25,5 +25,5 @@ func NewClient() (*devbridge.Client, error) {
 		cfg.APIKey = cred.APIKey
 	}
 
-	return devbridge.NewClient(cfg)
+	return devbridge.New(cfg)
 }

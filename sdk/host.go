@@ -1,4 +1,4 @@
-package devbridge
+package sdk
 
 import (
 	"context"
@@ -59,21 +59,21 @@ func init() {
 //  2. 在 WebSocket 上建立 SSH 会话
 //  3. 接受 relay channel，为每个 channel 创建内层 SSH 会话
 //  4. 通过端口转发把流量从远端转到本地端口
-func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
+func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 	if err := validateTunnelID(cfg.TunnelID); err != nil {
 		return err
 	}
 
-	// 认证回退：cfg 未显式指定时，使用 Client 级别的 API Key
+	// 认证回退：cfg 未显式指定时，使用 Devbridge 实例上的 API Key
 	apiKey := cfg.APIKey
 	if apiKey == "" && cfg.JWTToken == "" {
-		apiKey = c.apiKey
+		apiKey = d.apiKey
 	}
 
 	header, subprotocols := buildWSHeader(cfg.JWTToken, apiKey)
 	header.Set("Cookie", "APP_COOKIE=7")
 
-	sniHost := cfg.TunnelID + "." + c.gatewayHost
+	sniHost := cfg.TunnelID + "." + d.gatewayHost
 	wsURL := "wss://" + sniHost + "/" + cfg.TunnelID
 
 	const maxReconnectAttempts = 5
@@ -84,16 +84,16 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 	everConnected := false
 
 	for consecutiveFailures < maxReconnectAttempts {
-		connected, err := c.runHostSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, cfg.OnReady)
+		connected, err := d.runHostSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, cfg.OnReady)
 		if ctx.Err() != nil {
 			return nil
 		}
 		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
-			c.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
+			d.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
 			return nil
 		}
 		if errors.Is(err, ErrDuplicateHost) && !everConnected {
-			c.logger.Error("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
+			d.logger.Error("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
 			return nil
 		}
 		if err == nil {
@@ -106,7 +106,7 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 			consecutiveFailures++
 		}
 		if consecutiveFailures >= maxReconnectAttempts {
-			c.logger.Error("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
+			d.logger.Error("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
 			return nil
 		}
 
@@ -118,7 +118,7 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 		if delay > maxReconnectDelay {
 			delay = maxReconnectDelay
 		}
-		c.statusln("Connection lost, reconnecting...")
+		d.statusln("Connection lost, reconnecting...")
 		select {
 		case <-ctx.Done():
 			return nil
@@ -128,8 +128,8 @@ func (c *Client) Host(ctx context.Context, cfg HostConfig) error {
 	return nil
 }
 
-func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, onReady func([]int)) (connected bool, err error) {
-	netConn, err := c.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
+func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, onReady func([]int)) (connected bool, err error) {
+	netConn, err := d.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
 	if err != nil {
 		return false, err
 	}
@@ -140,14 +140,14 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 	outerConfig.KeyRotationThreshold = 0
 	tcp.AddPortForwardingService(outerConfig)
 	outerSession := ssh.NewClientSession(outerConfig)
-	outerSession.Trace = sshTraceFunc(c.logger)
+	outerSession.Trace = sshTraceFunc(d.logger)
 
 	if err := outerSession.Connect(ctx, netConn); err != nil {
 		err = parseSSHCloseError(err)
 		_ = netConn.Close()
 		return false, fmt.Errorf("outer SSH connect failed: %w", err)
 	}
-	c.logger.Debug("host: outer SSH session established", "tunnelID", tunnelID)
+	d.logger.Debug("host: outer SSH session established", "tunnelID", tunnelID)
 	connected = true
 
 	disconnected := make(chan struct{}, 1)
@@ -159,20 +159,20 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 	}
 	outerSession.OnKeepAliveFailed = func(count int) {
 		if count >= 5 {
-			c.logger.Error("keepalive failed 5 times, forcing reconnect", "tunnelID", tunnelID)
+			d.logger.Error("keepalive failed 5 times, forcing reconnect", "tunnelID", tunnelID)
 			_ = outerSession.Close()
 		}
 	}
 
 	pn := newPortNotifier()
 
-	go c.startHostAcceptLoop(ctx, outerSession, tunnelID, ports, pn)
+	go d.startHostAcceptLoop(ctx, outerSession, tunnelID, ports, pn)
 
 	if len(ports) == 0 {
 		select {
 		case <-pn.ready:
 		case <-time.After(5 * time.Second):
-			c.logger.Warn("timeout waiting for port notification from gateway")
+			d.logger.Warn("timeout waiting for port notification from gateway")
 		case <-disconnected:
 			return true, fmt.Errorf("disconnected")
 		case <-outerSession.Session.Done():
@@ -189,17 +189,17 @@ func (c *Client) runHostSession(ctx context.Context, wsURL string, sniHost strin
 	// host 端不需要为 -1 发起本地端口转发。
 	realPorts := filterForwardPorts(printPorts)
 	if len(realPorts) == 0 && len(printPorts) > 0 {
-		c.statusln("All ports mode: this tunnel accepts any port via URL")
-		c.statusf("Access your service at: https://%s-<port>.%s\n", tunnelID, c.gatewayHost)
+		d.statusln("All ports mode: this tunnel accepts any port via URL")
+		d.statusf("Access your service at: https://%s-<port>.%s\n", tunnelID, d.gatewayHost)
 	}
 	for _, p := range realPorts {
-		c.statusf("Hosting port: %s%d%s\n", colorCyan, p, colorReset)
+		d.statusf("Hosting port: %s%d%s\n", colorCyan, p, colorReset)
 	}
 	for _, p := range realPorts {
-		c.statusf("Tunnel URL: https://%s-%d.%s\n", tunnelID, p, c.gatewayHost)
+		d.statusf("Tunnel URL: https://%s-%d.%s\n", tunnelID, p, d.gatewayHost)
 	}
-	c.statusln("Ready to accept connections")
-	c.statusln("Auto reconnect: enabled")
+	d.statusln("Ready to accept connections")
+	d.statusln("Auto reconnect: enabled")
 
 	if onReady != nil {
 		onReady(realPorts)
@@ -227,7 +227,7 @@ func newPortNotifier() *portNotifier {
 	return &portNotifier{ready: make(chan struct{})}
 }
 
-func (c *Client) startHostAcceptLoop(ctx context.Context, outerSession *ssh.ClientSession, tunnelID string, ports []int, pn *portNotifier) {
+func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.ClientSession, tunnelID string, ports []int, pn *portNotifier) {
 	for {
 		channel, err := outerSession.AcceptChannel(ctx)
 		if err != nil {
@@ -251,9 +251,9 @@ func (c *Client) startHostAcceptLoop(ctx context.Context, outerSession *ssh.Clie
 			if len(effectivePorts) == 0 {
 				effectivePorts = pn.ports
 			}
-			go c.handleRelayChannel(ctx, channel, tunnelID, effectivePorts)
+			go d.handleRelayChannel(ctx, channel, tunnelID, effectivePorts)
 		default:
-			c.logger.Debug("host: draining non-relay channel",
+			d.logger.Debug("host: draining non-relay channel",
 				"channelType", channel.ChannelType, "channelID", channel.ChannelID)
 		}
 	}
@@ -277,18 +277,18 @@ func readPortNotification(channel *ssh.Channel) []int {
 	return ports
 }
 
-func (c *Client) handleRelayChannel(ctx context.Context, channel *ssh.Channel, tunnelID string, ports []int) {
+func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel, tunnelID string, ports []int) {
 	innerConfig := ssh.NewNoSecurityConfig()
 	tcp.AddPortForwardingService(innerConfig)
 	innerSession := ssh.NewServerSession(innerConfig)
 	innerSession.Credentials = &ssh.ServerCredentials{PublicKeys: []ssh.KeyPair{persistentHostKey}}
-	innerSession.Trace = sshTraceFunc(c.logger)
+	innerSession.Trace = sshTraceFunc(d.logger)
 
 	if err := innerSession.Connect(ctx, ssh.NewStream(channel)); err != nil {
-		c.logger.Error("inner SSH session failed", "channelID", channel.ChannelID, "err", err)
+		d.logger.Error("inner SSH session failed", "channelID", channel.ChannelID, "err", err)
 		return
 	}
-	c.logger.Debug("host: inner SSH server session established", "channelID", channel.ChannelID)
+	d.logger.Debug("host: inner SSH server session established", "channelID", channel.ChannelID)
 	hostSessionLookup[channel.ChannelID] = innerSession
 
 	pfs := tcp.GetPortForwardingService(&innerSession.Session)
@@ -296,7 +296,7 @@ func (c *Client) handleRelayChannel(ctx context.Context, channel *ssh.Channel, t
 		// 过滤"所有端口"哨兵值（-1），不被转发（不是合法监听端口）。
 		for _, port := range filterForwardPorts(ports) {
 			if _, err := pfs.ForwardFromRemotePort(ctx, "127.0.0.1", port, "127.0.0.1", port); err != nil {
-				c.logger.Error("forward port failed", "port", port, "err", err)
+				d.logger.Error("forward port failed", "port", port, "err", err)
 			}
 		}
 	}

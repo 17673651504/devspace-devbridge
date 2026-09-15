@@ -29,14 +29,14 @@ import (
 	"context"
 	"log"
 
-	sdk "github.com/huaweicloud/devspace-devbridge/sdk"
+	"github.com/huaweicloud/devspace-devbridge/sdk"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := sdk.NewClient(sdk.Config{APIKey: "your-api-key"})
+	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -121,7 +121,7 @@ err = client.Host(ctx, sdk.HostConfig{
 ### 客户端配置
 
 ```go
-client, err := sdk.NewClient(sdk.Config{
+client, err := sdk.New(sdk.Config{
 	APIKey:      "your-key",   // API Key，留空时读取 HW_API_KEY 环境变量
 	APIBaseURL:  "custom-url", // 自定义 REST API 地址
 	GatewayAddr: "addr:443",   // 自定义网关地址

@@ -1,4 +1,4 @@
-package devbridge
+package sdk
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 )
 
 // CreatePort 在隧道上创建端口
-func (c *Client) CreatePort(ctx context.Context, tunnelID string, port int, protocol string, allowAnonymous *bool) error {
+func (d *Devbridge) CreatePort(ctx context.Context, tunnelID string, port int, protocol string, allowAnonymous *bool) error {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return err
 	}
@@ -22,23 +22,23 @@ func (c *Client) CreatePort(ctx context.Context, tunnelID string, port int, prot
 		Protocol:       protocol,
 		AllowAnonymous: allowAnonymous,
 	}
-	return c.post(ctx, fmt.Sprintf("/tunnels/%s/ports", tunnelID), req, nil)
+	return d.api.Post(ctx, fmt.Sprintf("/tunnels/%s/ports", tunnelID), req, nil)
 }
 
 // ListPorts 查询隧道的端口列表
-func (c *Client) ListPorts(ctx context.Context, tunnelID string) ([]Port, error) {
+func (d *Devbridge) ListPorts(ctx context.Context, tunnelID string) ([]Port, error) {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return nil, err
 	}
 	var result []Port
-	if err := c.get(ctx, fmt.Sprintf("/tunnels/%s/ports", tunnelID), &result); err != nil {
+	if err := d.api.Get(ctx, fmt.Sprintf("/tunnels/%s/ports", tunnelID), &result); err != nil {
 		return nil, err
 	}
 	return result, nil
 }
 
 // ShowPort 查询端口详情
-func (c *Client) ShowPort(ctx context.Context, tunnelID string, port int) (*Port, error) {
+func (d *Devbridge) ShowPort(ctx context.Context, tunnelID string, port int) (*Port, error) {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return nil, err
 	}
@@ -46,14 +46,14 @@ func (c *Client) ShowPort(ctx context.Context, tunnelID string, port int) (*Port
 		return nil, err
 	}
 	var result Port
-	if err := c.get(ctx, fmt.Sprintf("/tunnels/%s/ports/%d", tunnelID, port), &result); err != nil {
+	if err := d.api.Get(ctx, fmt.Sprintf("/tunnels/%s/ports/%d", tunnelID, port), &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
 // UpdatePort 更新端口的匿名访问策略，allowAnonymous 为 nil 时不修改
-func (c *Client) UpdatePort(ctx context.Context, tunnelID string, port int, allowAnonymous *bool) error {
+func (d *Devbridge) UpdatePort(ctx context.Context, tunnelID string, port int, allowAnonymous *bool) error {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return err
 	}
@@ -61,16 +61,16 @@ func (c *Client) UpdatePort(ctx context.Context, tunnelID string, port int, allo
 		return err
 	}
 	req := updatePortRequest{AllowAnonymous: allowAnonymous}
-	return c.put(ctx, fmt.Sprintf("/tunnels/%s/ports/%d", tunnelID, port), req, nil)
+	return d.api.Put(ctx, fmt.Sprintf("/tunnels/%s/ports/%d", tunnelID, port), req, nil)
 }
 
 // DeletePort 删除端口
-func (c *Client) DeletePort(ctx context.Context, tunnelID string, port int) error {
+func (d *Devbridge) DeletePort(ctx context.Context, tunnelID string, port int) error {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return err
 	}
 	if err := validatePortNumber(port); err != nil {
 		return err
 	}
-	return c.delete(ctx, fmt.Sprintf("/tunnels/%s/ports/%d", tunnelID, port), nil)
+	return d.api.Delete(ctx, fmt.Sprintf("/tunnels/%s/ports/%d", tunnelID, port), nil)
 }

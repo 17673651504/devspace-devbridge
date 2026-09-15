@@ -1,4 +1,4 @@
-package devbridge
+package sdk
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func buildWSHeader(jwtToken, apiKey string) (http.Header, []string) {
 	header := http.Header{}
 	subprotocols := []string{subprotocolDevBridge}
 	if apiKey != "" {
-		header.Set(headerXAPIKey, apiKey)
+		header.Set("X-API-Key", apiKey)
 	}
 	if jwtToken != "" {
 		header.Set("Sec-WebSocket-Protocol", subprotocolDevBridge+", "+jwtToken)
@@ -46,12 +46,12 @@ func buildWSHeader(jwtToken, apiKey string) (http.Header, []string) {
 }
 
 // dialWebSocket 建立 WebSocket 连接，转换为 net.Conn，带重试
-func (c *Client) dialWebSocket(ctx context.Context, wsURL, sniHost string, header http.Header, subprotocols []string, maxRetries int) (net.Conn, error) {
+func (d *Devbridge) dialWebSocket(ctx context.Context, wsURL, sniHost string, header http.Header, subprotocols []string, maxRetries int) (net.Conn, error) {
 	dialCtx, dialCancel := context.WithTimeout(ctx, 30*time.Second)
 	defer dialCancel()
 
-	conn, err := c.dialWithRetry(dialCtx, wsURL, &websocket.DialOptions{
-		HTTPClient:   c.getWSHTTPClient(sniHost),
+	conn, err := d.dialWithRetry(dialCtx, wsURL, &websocket.DialOptions{
+		HTTPClient:   d.getWSHTTPClient(sniHost),
 		HTTPHeader:   header,
 		Subprotocols: subprotocols,
 	}, maxRetries)
@@ -63,7 +63,7 @@ func (c *Client) dialWebSocket(ctx context.Context, wsURL, sniHost string, heade
 
 // getWSHTTPClient 创建用于 WebSocket 握手的 HTTP 客户端
 // 关键：DialContext 被替换为拨号到网关地址，TLS SNI 设为 sniHost
-func (c *Client) getWSHTTPClient(sniHost string) *http.Client {
+func (d *Devbridge) getWSHTTPClient(sniHost string) *http.Client {
 	dialer := &net.Dialer{}
 	return &http.Client{
 		Transport: &http.Transport{
@@ -73,25 +73,25 @@ func (c *Client) getWSHTTPClient(sniHost string) *http.Client {
 				ServerName: sniHost,
 			},
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-				return dialer.DialContext(ctx, network, c.gatewayAddr)
+				return dialer.DialContext(ctx, network, d.gatewayAddr)
 			},
 		},
 	}
 }
 
 // dialWithRetry 带指数退避重试的 WebSocket 拨号
-func (c *Client) dialWithRetry(ctx context.Context, url string, opts *websocket.DialOptions, maxRetries int) (*websocket.Conn, error) {
+func (d *Devbridge) dialWithRetry(ctx context.Context, url string, opts *websocket.DialOptions, maxRetries int) (*websocket.Conn, error) {
 	const baseDelay = 1 * time.Second
 	const maxDelay = 30 * time.Second
 
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
-		c.logger.Debug("WebSocket handshake attempt",
+		d.logger.Debug("WebSocket handshake attempt",
 			"attempt", attempt+1, "maxRetries", maxRetries, "url", url)
 
 		conn, resp, err := websocket.Dial(ctx, url, opts)
 		if err == nil {
-			c.logger.Debug("WebSocket handshake succeeded", "attempt", attempt+1, "url", url)
+			d.logger.Debug("WebSocket handshake succeeded", "attempt", attempt+1, "url", url)
 			return conn, nil
 		}
 		lastErr = err
@@ -107,11 +107,11 @@ func (c *Client) dialWithRetry(ctx context.Context, url string, opts *websocket.
 			_ = resp.Body.Close()
 			reason := strings.TrimSpace(string(body))
 			if attempt == 0 {
-				c.statusf("Connection rejected by gateway: %s, retrying...\n", reason)
+				d.statusf("Connection rejected by gateway: %s, retrying...\n", reason)
 			}
 			lastErr = fmt.Errorf("connection rejected by gateway (429): %s", reason)
 		} else if attempt == 0 {
-			c.statusln("Connection failed, retrying...")
+			d.statusln("Connection failed, retrying...")
 		}
 
 		if attempt == maxRetries {
@@ -125,7 +125,7 @@ func (c *Client) dialWithRetry(ctx context.Context, url string, opts *websocket.
 		}
 		jittered := time.Duration(rand.Int64N(int64(delay)))
 
-		c.logger.Debug("WebSocket dial retry",
+		d.logger.Debug("WebSocket dial retry",
 			"attempt", attempt+1, "retryAfter", jittered, "err", lastErr)
 
 		select {

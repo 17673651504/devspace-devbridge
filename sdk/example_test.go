@@ -1,4 +1,4 @@
-package devbridge_test
+package sdk_test
 
 import (
 	"context"
@@ -13,11 +13,11 @@ import (
 // 示例 1：完整流程 — 创建隧道 → 添加端口 → Host 托管 → Connect 连接
 // ──────────────────────────────────────────────────────────────
 
-func ExampleClient_fullWorkflow() {
+func ExampleDevbridge_fullWorkflow() {
 	ctx := context.Background()
 
 	// 创建客户端（API Key 也可通过 HW_API_KEY 环境变量设置）
-	client, err := devbridge.NewClient(devbridge.Config{APIKey: "your-api-key"})
+	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func ExampleClient_fullWorkflow() {
 	// 这会阻塞，通常在单独的 goroutine 中运行：
 	hostCtx, hostCancel := context.WithCancel(context.Background())
 	go func() {
-		if err := client.Host(hostCtx, devbridge.HostConfig{
+		if err := client.Host(hostCtx, sdk.HostConfig{
 			TunnelID: tunnel.ID,
 			Ports:    []int{8080},
 		}); err != nil {
@@ -55,7 +55,7 @@ func ExampleClient_fullWorkflow() {
 	// 连接成功后，在访问设备上 http://localhost:8080 即可访问远端服务
 	connectCtx, connectCancel := context.WithCancel(context.Background())
 	go func() {
-		if err := client.Connect(connectCtx, devbridge.ConnectConfig{
+		if err := client.Connect(connectCtx, sdk.ConnectConfig{
 			TunnelID: tunnel.ID,
 			Ports:    []int{8080},
 		}); err != nil {
@@ -75,8 +75,8 @@ func ExampleClient_fullWorkflow() {
 // 示例 2：使用已有隧道 Host 托管
 // ──────────────────────────────────────────────────────────────
 
-func ExampleClient_host() {
-	client, err := devbridge.NewClient(devbridge.Config{APIKey: "your-api-key"})
+func ExampleDevbridge_host() {
+	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func ExampleClient_host() {
 	}
 
 	// 启动 Host（阻塞）
-	err = client.Host(context.Background(), devbridge.HostConfig{
+	err = client.Host(context.Background(), sdk.HostConfig{
 		TunnelID: "aaaadysa",
 		Ports:    portList,
 	})
@@ -106,8 +106,8 @@ func ExampleClient_host() {
 // 示例 3：使用 JWT 令牌（跳过 API 调用）
 // ──────────────────────────────────────────────────────────────
 
-func ExampleClient_hostWithToken() {
-	client, err := devbridge.NewClient(devbridge.Config{})
+func ExampleDevbridge_hostWithToken() {
+	client, err := sdk.New(sdk.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -119,7 +119,7 @@ func ExampleClient_hostWithToken() {
 	}
 
 	// 用令牌启动 Host，不再调用 REST API
-	err = client.Host(context.Background(), devbridge.HostConfig{
+	err = client.Host(context.Background(), sdk.HostConfig{
 		TunnelID: "aaaadysa",
 		JWTToken: token.Token,
 	})
@@ -132,15 +132,15 @@ func ExampleClient_hostWithToken() {
 // 示例 4：Connect 连接并访问远端服务
 // ──────────────────────────────────────────────────────────────
 
-func ExampleClient_connect() {
-	client, err := devbridge.NewClient(devbridge.Config{APIKey: "your-api-key"})
+func ExampleDevbridge_connect() {
+	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// 连接隧道，在本地建立端口映射
 	// 连接成功后，http://localhost:8080 → 远端 Host 的 8080 端口
-	err = client.Connect(context.Background(), devbridge.ConnectConfig{
+	err = client.Connect(context.Background(), sdk.ConnectConfig{
 		TunnelID: "aaaadysa",
 		Ports:    []int{8080},
 	})
@@ -153,9 +153,9 @@ func ExampleClient_connect() {
 // 示例 5：隧道管理
 // ──────────────────────────────────────────────────────────────
 
-func ExampleClient_tunnelManagement() {
+func ExampleDevbridge_tunnelManagement() {
 	ctx := context.Background()
-	client, err := devbridge.NewClient(devbridge.Config{APIKey: "your-api-key"})
+	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
 	if err != nil {
 		log.Fatal(err)
 	}

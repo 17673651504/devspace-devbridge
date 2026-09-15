@@ -1,4 +1,4 @@
-package devbridge
+package sdk
 
 import (
 	"errors"
