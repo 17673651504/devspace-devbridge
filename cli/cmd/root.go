@@ -41,7 +41,10 @@ var versionCmd = &cobra.Command{
 		fmt.Println(version)
 		if result := updater.CheckSync(version); result != nil {
 			if updater.IsNewer(version, result.LatestVersion) {
-				fmt.Printf("\nA new version is available: %s (current: %s)\nUpdate:\n%s\n",
+				// 更新通知属于信息性输出，输出到 stderr，
+				// 保持 stdout 只含版本号，与 CheckAsync 行为一致，
+				// 避免 CI 版本注入校验等多行 stdout 比较失败。
+				fmt.Fprintf(os.Stderr, "\nA new version is available: %s (current: %s)\nUpdate:\n%s\n",
 					result.LatestVersion, version, updater.InstallCommand())
 			}
 		}
