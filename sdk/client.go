@@ -16,9 +16,9 @@ import (
 
 const (
 	DefaultAPIBaseURL  = "https://bridge.developer.myhuaweicloud.com/open-api-inner/v1/relay-controller"
-	DefaultGatewayAddr = "gateway.cn-north-4-bridge.myhuaweicloud.com:443"
-	DefaultGatewayHost = "cn-north-4-bridge.myhuaweicloud.com"
-	DefaultClusterID   = "cn-north-4-bridge"
+	DefaultGatewayAddr = "gateway.devbridge-s2.hwtunnel.com:443"
+	DefaultGatewayHost = "devbridge-s2.hwtunnel.com"
+	DefaultClusterID   = "devbridge-s2"
 )
 
 var (

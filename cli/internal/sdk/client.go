@@ -11,10 +11,10 @@ import (
 )
 
 // ServerAddr WebSocket 网关地址（host:port），供 ldflags 注入。
-var ServerAddr = "gateway.cn-north-4-bridge.myhuaweicloud.com:443"
+var ServerAddr = "gateway.devbridge-s2.hwtunnel.com:443"
 
 // ServerHost WebSocket 网关 SNI host，供 ldflags 注入。
-var ServerHost = "cn-north-4-bridge.myhuaweicloud.com"
+var ServerHost = "devbridge-s2.hwtunnel.com"
 
 // resolveGatewayAddr 解析 WebSocket 网关地址，优先级：
 // 配置文件 gateway-addr > ldflags 注入的 ServerAddr。
