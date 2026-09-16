@@ -96,7 +96,7 @@ var portListCmd = &cobra.Command{
 		var rows [][]string
 		for _, p := range ports {
 			rows = append(rows, []string{
-				strconv.Itoa(int(p.Port)),
+				strconv.Itoa(p.Port),
 				p.Protocol,
 				strconv.FormatBool(p.AllowAnonymous),
 				p.TunnelID,
@@ -123,7 +123,7 @@ var portShowCmd = &cobra.Command{
 		}
 		printKV([][2]string{
 			{i18n.T(i18n.Msg.Tunnel.TunnelID), result.TunnelID},
-			{i18n.T(i18n.Msg.Port.Port), strconv.Itoa(int(result.Port))},
+			{i18n.T(i18n.Msg.Port.Port), strconv.Itoa(result.Port)},
 			{i18n.T(i18n.Msg.Port.Protocol), result.Protocol},
 			{i18n.T(i18n.Msg.Port.AllowAnonymous), strconv.FormatBool(result.AllowAnonymous)},
 		})

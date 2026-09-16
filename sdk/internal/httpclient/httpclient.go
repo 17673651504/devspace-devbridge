@@ -53,20 +53,22 @@ type Client struct {
 	Logger  *slog.Logger
 }
 
-// New 创建 HTTP 客户端，HTTP/Logger 为 nil 时使用默认值
-func New(apiKey, baseURL string, httpClient *http.Client, logger *slog.Logger) *Client {
-	if httpClient == nil {
-		httpClient = &http.Client{
+// New 创建 HTTP 客户端，logger 为 nil 时使用默认值
+func New(apiKey, baseURL string, logger *slog.Logger) *Client {
+	if logger == nil {
+		logger = slog.Default()
+	}
+	return &Client{
+		APIKey:  apiKey,
+		BaseURL: baseURL,
+		HTTP: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			},
-		}
+		},
+		Logger: logger,
 	}
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &Client{APIKey: apiKey, BaseURL: baseURL, HTTP: httpClient, Logger: logger}
 }
 
 func (c *Client) Get(ctx context.Context, path string, result any) error {

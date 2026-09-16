@@ -29,7 +29,7 @@ func portsToInt(ports []int) []int {
 func portResultsToInt(results []devbridge.Port) []int {
 	ports := make([]int, len(results))
 	for i, p := range results {
-		ports[i] = int(p.Port)
+		ports[i] = p.Port
 	}
 	return ports
 }

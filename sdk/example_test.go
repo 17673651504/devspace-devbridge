@@ -87,7 +87,7 @@ func ExampleDevbridge_host() {
 
 	portList := make([]int, len(ports))
 	for i, p := range ports {
-		portList[i] = int(p.Port)
+		portList[i] = p.Port
 	}
 
 	// 启动 Host（阻塞）

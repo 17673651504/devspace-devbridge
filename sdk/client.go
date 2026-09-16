@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"regexp"
 
@@ -53,10 +52,6 @@ type Config struct {
 	// GatewayHost is the WebSocket gateway SNI host.
 	// Defaults to DefaultGatewayHost.
 	GatewayHost string
-
-	// HTTPClient optionally overrides the HTTP client used for REST API
-	// requests. If nil, a default client with 30s timeout is used.
-	HTTPClient *http.Client
 
 	// StatusWriter receives user-facing status lines (connection progress,
 	// hosted ports, forwarding info). Defaults to os.Stdout; set it to
@@ -106,7 +101,7 @@ func New(cfg Config) *Devbridge {
 		gatewayHost:  resolved.GatewayHost,
 		logger:       slog.Default(),
 		statusWriter: resolved.StatusWriter,
-		api:          httpclient.New(resolved.APIKey, resolved.APIBaseURL, resolved.HTTPClient, slog.Default()),
+		api:          httpclient.New(resolved.APIKey, resolved.APIBaseURL, slog.Default()),
 	}
 }
 
