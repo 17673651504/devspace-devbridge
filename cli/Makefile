@@ -2,8 +2,8 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 SERVER_DOMAIN ?= http://relay-dev-local.tailb4159e.ts.net:8443
 LOGIN_URL ?= https://devstation.ulanqab.huawei.com
-GATEWAY_ADDR ?= gateway.devbridge-s2.hwtunnel.com
-CLUSTER_DOMAIN ?= devbridge-s2.hwtunnel.com
+GATEWAY_ADDR ?= gateway.hwtunnel.com
+CLUSTER_DOMAIN ?= hwtunnel.com
 
 LDFLAGS = -X huawei.com/devbridge/cmd.version=$(VERSION) \
           -X huawei.com/devbridge/internal/auth.LoginURL=$(LOGIN_URL) \
@@ -32,7 +32,7 @@ build-test: build
 build-prod: VERSION := prod
 build-prod: SERVER_DOMAIN := https://devstation.myhuaweicloud.com
 build-prod: LOGIN_URL := https://devstation.connect.huaweicloud.com
-build-prod: GATEWAY_ADDR := gateway.devbridge-s2.hwtunnel.com:443
+build-prod: GATEWAY_ADDR := gateway.hwtunnel.com:443
 build-prod: build
 
 # 跨平台构建: 产物名含版本号（与 install.sh 对齐: devbridge_{OS}_{Arch}_{Version}）
