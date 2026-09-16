@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"huawei.com/devbridge/internal/i18n"
-	"huawei.com/devbridge/internal/sdk"
 
 	"github.com/spf13/cobra"
 )
@@ -61,10 +60,7 @@ var portCreateCmd = &cobra.Command{
 		if err := validateProtocolLocal(portProtocol); err != nil {
 			return err
 		}
-		client, err := sdk.NewClient()
-		if err != nil {
-			return err
-		}
+		client := newSDKClient()
 		if err := client.CreatePort(context.Background(), tunnelID, portNumber, portProtocol, resolveAllowAnon(cmd)); err != nil {
 			return fmt.Errorf("Failed to add port %d: %w", portNumber, err)
 		}
@@ -82,10 +78,7 @@ var portListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		client, err := sdk.NewClient()
-		if err != nil {
-			return err
-		}
+		client := newSDKClient()
 		ports, err := client.ListPorts(context.Background(), tunnelID)
 		if err != nil {
 			return err
@@ -123,10 +116,7 @@ var portShowCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		client, err := sdk.NewClient()
-		if err != nil {
-			return err
-		}
+		client := newSDKClient()
 		result, err := client.ShowPort(context.Background(), tunnelID, portNumber)
 		if err != nil {
 			return err
@@ -150,10 +140,7 @@ var portUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		client, err := sdk.NewClient()
-		if err != nil {
-			return err
-		}
+		client := newSDKClient()
 		if err := client.UpdatePort(context.Background(), tunnelID, portNumber, resolveAllowAnon(cmd)); err != nil {
 			return err
 		}
@@ -171,10 +158,7 @@ var portDeleteCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		client, err := sdk.NewClient()
-		if err != nil {
-			return err
-		}
+		client := newSDKClient()
 		if err := client.DeletePort(context.Background(), tunnelID, portNumber); err != nil {
 			return fmt.Errorf("Failed to delete port %d: %w", portNumber, err)
 		}

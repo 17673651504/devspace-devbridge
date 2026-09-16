@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"huawei.com/devbridge/internal/i18n"
-	"huawei.com/devbridge/internal/sdk"
 	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
 
 	"github.com/spf13/cobra"
@@ -16,10 +15,7 @@ var limitsCmd = &cobra.Command{
 	Short: i18n.T(i18n.Msg.Limits.LimitsShort),
 	Args:  cobra.NoArgs,
 	RunE: runError(func(cmd *cobra.Command, args []string) error {
-		client, err := sdk.NewClient()
-		if err != nil {
-			return err
-		}
+		client := newSDKClient()
 		result, err := client.GetLimits(context.Background())
 		if err != nil {
 			return err

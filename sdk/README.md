@@ -36,10 +36,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	client := sdk.New(sdk.Config{APIKey: "your-api-key"})
 
 	// 1. 创建隧道
 	tunnel, err := client.CreateTunnel(ctx, "my-tunnel", "开发联调", nil)
@@ -121,7 +118,7 @@ err = client.Host(ctx, sdk.HostConfig{
 ### 客户端配置
 
 ```go
-client, err := sdk.New(sdk.Config{
+client := sdk.New(sdk.Config{
 	APIKey:      "your-key",   // API Key，留空时读取 HW_API_KEY 环境变量
 	APIBaseURL:  "custom-url", // 自定义 REST API 地址
 	GatewayAddr: "addr:443",   // 自定义网关地址

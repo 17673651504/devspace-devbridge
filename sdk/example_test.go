@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2027. All rights reserved.
+ */
+
 package sdk_test
 
 import (
@@ -17,10 +21,7 @@ func ExampleDevbridge_fullWorkflow() {
 	ctx := context.Background()
 
 	// 创建客户端（API Key 也可通过 HW_API_KEY 环境变量设置）
-	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	client := sdk.New(sdk.Config{APIKey: "your-api-key"})
 
 	// 1. 创建隧道
 	tunnel, err := client.CreateTunnel(ctx, "my-dev-tunnel", "开发联调环境", nil)
@@ -76,10 +77,7 @@ func ExampleDevbridge_fullWorkflow() {
 // ──────────────────────────────────────────────────────────────
 
 func ExampleDevbridge_host() {
-	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	client := sdk.New(sdk.Config{APIKey: "your-api-key"})
 
 	// 查询隧道端口
 	ports, err := client.ListPorts(context.Background(), "aaaadysa")
@@ -107,10 +105,7 @@ func ExampleDevbridge_host() {
 // ──────────────────────────────────────────────────────────────
 
 func ExampleDevbridge_hostWithToken() {
-	client, err := sdk.New(sdk.Config{})
-	if err != nil {
-		log.Fatal(err)
-	}
+	client := sdk.New(sdk.Config{})
 
 	// 先签发 Host 令牌
 	token, err := client.IssueToken(context.Background(), "aaaadysa", "host")
@@ -133,14 +128,11 @@ func ExampleDevbridge_hostWithToken() {
 // ──────────────────────────────────────────────────────────────
 
 func ExampleDevbridge_connect() {
-	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	client := sdk.New(sdk.Config{APIKey: "your-api-key"})
 
 	// 连接隧道，在本地建立端口映射
 	// 连接成功后，http://localhost:8080 → 远端 Host 的 8080 端口
-	err = client.Connect(context.Background(), sdk.ConnectConfig{
+	err := client.Connect(context.Background(), sdk.ConnectConfig{
 		TunnelID: "aaaadysa",
 		Ports:    []int{8080},
 	})
@@ -155,10 +147,7 @@ func ExampleDevbridge_connect() {
 
 func ExampleDevbridge_tunnelManagement() {
 	ctx := context.Background()
-	client, err := sdk.New(sdk.Config{APIKey: "your-api-key"})
-	if err != nil {
-		log.Fatal(err)
-	}
+	client := sdk.New(sdk.Config{APIKey: "your-api-key"})
 
 	// 创建隧道，有效期 24 小时
 	exp := 24

@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2027. All rights reserved.
+ */
+
 // Package httpclient 实现 DevBridge REST API 的底层 HTTP 通信。
 //
 // 仅供 SDK 根包使用（Go internal 机制，外部无法导入），负责：

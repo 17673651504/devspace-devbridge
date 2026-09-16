@@ -7,11 +7,24 @@ import (
 	"huawei.com/devbridge/internal/auth"
 	"huawei.com/devbridge/internal/config"
 	"huawei.com/devbridge/internal/i18n"
+	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
 
 	"github.com/spf13/cobra"
 )
 
 var hcLoginAPIKey string
+
+// newSDKClient resolves the API key from the CLI auth system and assembles an
+// SDK client. The API key is resolved in the cmd layer so that the config
+// package does not need to depend on the auth package (which would introduce
+// an import cycle).
+func newSDKClient() *devbridge.Devbridge {
+	var apiKey string
+	if cred := auth.ReadValidAPIKey(); cred != nil {
+		apiKey = cred.APIKey
+	}
+	return config.NewClient(apiKey)
+}
 
 var authCmd = &cobra.Command{
 	Use:   "auth",

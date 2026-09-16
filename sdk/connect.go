@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2027. All rights reserved.
+ */
+
 package sdk
 
 import (
@@ -74,7 +78,7 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 		}
 		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
 			d.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
-			return nil
+			return err
 		}
 		if connected {
 			consecutiveFailures = 0
@@ -83,7 +87,7 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 		}
 		if consecutiveFailures >= maxReconnectAttempts {
 			d.logger.Error("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
-			return nil
+			return fmt.Errorf("reconnect failed after %d attempts: %w", maxReconnectAttempts, err)
 		}
 
 		delay := baseReconnectDelay

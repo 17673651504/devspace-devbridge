@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2027. All rights reserved.
+ */
+
 // Package sdk 提供 DevBridge 隧道服务的 Go 客户端：
 // 隧道与端口的 REST API 管理，以及 Host 托管与 Connect 连接能力。
 package sdk
@@ -15,8 +19,8 @@ import (
 
 const (
 	DefaultAPIBaseURL  = "https://bridge.developer.myhuaweicloud.com/open-api-inner/v1/relay-controller"
-	DefaultGatewayAddr = "gateway.cn-north-4-bridge.myhuaweicloud.com:443"
-	DefaultGatewayHost = "cn-north-4-bridge.myhuaweicloud.com"
+	DefaultGatewayAddr = "gateway.devbridge-s2.hwtunnel.com:443"
+	DefaultGatewayHost = "devbridge-s2.hwtunnel.com"
 	DefaultClusterID   = "cn-north-4-bridge"
 )
 
@@ -94,7 +98,7 @@ type Devbridge struct {
 // New creates a new SDK client from the given Config.
 // A zero Config is valid; APIKey falls back to HW_API_KEY env var,
 // and other fields fall back to sensible defaults.
-func New(cfg Config) (*Devbridge, error) {
+func New(cfg Config) *Devbridge {
 	resolved := cfg.resolve()
 	return &Devbridge{
 		apiKey:       resolved.APIKey,
@@ -103,7 +107,7 @@ func New(cfg Config) (*Devbridge, error) {
 		logger:       slog.Default(),
 		statusWriter: resolved.StatusWriter,
 		api:          httpclient.New(resolved.APIKey, resolved.APIBaseURL, resolved.HTTPClient, slog.Default()),
-	}, nil
+	}
 }
 
 func (d *Devbridge) statusf(format string, args ...any) {

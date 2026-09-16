@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2027. All rights reserved.
+ */
+
 package sdk
 
 // Tunnel 隧道
@@ -77,13 +81,4 @@ type createPortRequest struct {
 
 type updatePortRequest struct {
 	AllowAnonymous *bool `json:"allowAnonymous,omitempty"`
-}
-
-// errorBody 是另一种错误格式（部分接口使用）
-type errorBody struct {
-	Error struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-		Target  string `json:"target"`
-	} `json:"error"`
 }

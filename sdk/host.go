@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) Huawei Technologies Co., Ltd. 2026-2027. All rights reserved.
+ */
+
 package sdk
 
 import (
@@ -5,8 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -38,16 +42,18 @@ type relayPortMessage struct {
 }
 
 var (
-	hostSessionLookup = make(map[uint32]*ssh.ServerSession)
+	hostKeyOnce       sync.Once
 	persistentHostKey ssh.KeyPair
+	hostKeyErr        error
 )
 
-func init() {
-	var err error
-	persistentHostKey, err = ssh.GenerateKeyPair(ssh.AlgoPKEcdsaSha2P256)
-	if err != nil {
-		slog.Error("Failed to generate host key", "err", err)
-	}
+// ensureHostKey 生成进程内唯一的 SSH host key。
+// 生成失败会缓存错误并在后续每次调用返回，避免在会话层静默使用 nil key。
+func ensureHostKey() error {
+	hostKeyOnce.Do(func() {
+		persistentHostKey, hostKeyErr = ssh.GenerateKeyPair(ssh.AlgoPKEcdsaSha2P256)
+	})
+	return hostKeyErr
 }
 
 // Host 启动 Host 托管服务。
@@ -60,6 +66,9 @@ func init() {
 //  3. 接受 relay channel，为每个 channel 创建内层 SSH 会话
 //  4. 通过端口转发把流量从远端转到本地端口
 func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
+	if err := ensureHostKey(); err != nil {
+		return fmt.Errorf("generate host key: %w", err)
+	}
 	if err := validateTunnelID(cfg.TunnelID); err != nil {
 		return err
 	}
@@ -90,11 +99,11 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 		}
 		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
 			d.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
-			return nil
+			return err
 		}
 		if errors.Is(err, ErrDuplicateHost) && !everConnected {
 			d.logger.Error("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
-			return nil
+			return err
 		}
 		if err == nil {
 			return nil
@@ -107,7 +116,7 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 		}
 		if consecutiveFailures >= maxReconnectAttempts {
 			d.logger.Error("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
-			return nil
+			return fmt.Errorf("reconnect failed after %d attempts: %w", maxReconnectAttempts, err)
 		}
 
 		shift := consecutiveFailures - 1
@@ -289,7 +298,6 @@ func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel
 		return
 	}
 	d.logger.Debug("host: inner SSH server session established", "channelID", channel.ChannelID)
-	hostSessionLookup[channel.ChannelID] = innerSession
 
 	pfs := tcp.GetPortForwardingService(&innerSession.Session)
 	if pfs != nil && len(ports) > 0 {
@@ -307,10 +315,5 @@ func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel
 				return
 			}
 		}
-	}(channel.ChannelID)
-
-	go func(chID uint32) {
-		<-innerSession.Session.Done()
-		delete(hostSessionLookup, chID)
 	}(channel.ChannelID)
 }
