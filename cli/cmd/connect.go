@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"huawei.com/devbridge/internal/auth"
 	"huawei.com/devbridge/internal/config"
-	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
+	devbridge "github.com/huaweicloud/devspace-devbridge/go-sdk"
 )
 
 var hostPorts []int

@@ -7,7 +7,7 @@ package sdk
 import (
 	"errors"
 
-	"github.com/huaweicloud/devspace-devbridge/sdk/internal/httpclient"
+	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/httpclient"
 )
 
 var ErrMissingAPIKey = errors.New("missing API key: set it via Config.APIKey or HW_API_KEY env var")
@@ -28,10 +28,10 @@ var ErrInvalidProtocol = errors.New("invalid protocol: must be http, https, or a
 
 var ErrInvalidScope = errors.New("invalid token scope: must be host or connect")
 
-// APIError 表示服务端返回的业务错误
+// APIError represents a business error returned by the server.
 type APIError = httpclient.APIError
 
-// IsAPIError 判断 error 是否为 APIError，并返回错误码
+// IsAPIError reports whether err is an APIError and returns its code.
 func IsAPIError(err error) (code string, ok bool) {
 	var apiErr *APIError
 	if errors.As(err, &apiErr) {

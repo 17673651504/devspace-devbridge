@@ -9,7 +9,7 @@ import (
 
 	"huawei.com/devbridge/internal/config"
 	"huawei.com/devbridge/internal/i18n"
-	devbridge "github.com/huaweicloud/devspace-devbridge/sdk"
+	devbridge "github.com/huaweicloud/devspace-devbridge/go-sdk"
 
 	"github.com/spf13/cobra"
 )
