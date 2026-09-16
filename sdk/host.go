@@ -30,13 +30,6 @@ type HostConfig struct {
 	OnReady func(ports []int)
 }
 
-// HostResult Host 运行结果信息
-type HostResult struct {
-	TunnelID  string
-	Ports     []int
-	TunnelURL string
-}
-
 type relayPortMessage struct {
 	Ports []uint16 `json:"ports"`
 }

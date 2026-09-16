@@ -34,7 +34,7 @@ type TunnelStatus struct {
 // Port 端口配置
 type Port struct {
 	TunnelID       string `json:"tunnelId"`
-	Port           int32  `json:"port"`
+	Port           int    `json:"port"`
 	Protocol       string `json:"protocol"` // http, https, auto
 	AllowAnonymous bool   `json:"allowAnonymous"`
 }

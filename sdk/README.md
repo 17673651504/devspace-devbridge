@@ -2,7 +2,9 @@
 
 DevBridge 是华为云的开发隧道服务，通过中继连接 Host（本地服务托管）与 Connect（远端连接），使本地服务无需公网入站端口即可被远程访问。
 
-本 SDK 把 DevBridge CLI 的核心能力封装为 Go API，支持：
+本 SDK 把 DevBridge CLI 的核心能力封装为 Go API。
+
+## 特性
 
 - **隧道管理**：创建、查询、更新、删除隧道
 - **端口管理**：创建、查询、更新、删除端口
@@ -77,8 +79,6 @@ func main() {
 }
 ```
 
-更多示例见 [example_test.go](./example_test.go)。
-
 ### 仅 Host 托管
 
 ```go
@@ -113,7 +113,19 @@ err = client.Host(ctx, sdk.HostConfig{
 })
 ```
 
+## 示例
+
+更完整的可运行示例见 [example_test.go](./example_test.go)，涵盖：
+
+- 完整流程：创建隧道 → 添加端口 → Host 托管 → Connect 连接
+- 使用已有隧道 Host 托管
+- 使用 JWT 令牌（跳过 API 调用）
+- Connect 连接并访问远端服务
+- 隧道管理
+
 ## API 参考
+
+完整的类型与方法文档见 [pkg.go.dev](https://pkg.go.dev/github.com/huaweicloud/devspace-devbridge/sdk)。
 
 ### 客户端配置
 
