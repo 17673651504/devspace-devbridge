@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"huawei.com/devbridge/internal/i18n"
 	devbridge "github.com/huaweicloud/devspace-devbridge/go-sdk"
+	"huawei.com/devbridge/internal/i18n"
 
 	"github.com/spf13/cobra"
 )

@@ -99,9 +99,6 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 			d.logger.Error("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
 			return err
 		}
-		if err == nil {
-			return nil
-		}
 		if connected {
 			consecutiveFailures = 0
 			everConnected = true

@@ -115,7 +115,7 @@ func (d *Devbridge) statusln(args ...any) {
 
 func validateTunnelID(id string) error {
 	if !tunnelIDRegexp.MatchString(id) {
-		return fmt.Errorf("%w: got %q", ErrInvalidTunnelID, id)
+		return fmt.Errorf("%w: %q (only lowercase letters and digits 2-7 allowed, length must be 8)", ErrInvalidTunnelID, id)
 	}
 	return nil
 }

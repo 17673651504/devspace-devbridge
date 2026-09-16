@@ -18,7 +18,7 @@ var ErrDuplicateHost = errors.New("host already connected for this tunnel")
 
 var ErrQuotaExceeded = errors.New("account quota exceeded")
 
-var ErrInvalidTunnelID = errors.New("invalid tunnel ID: must be 8 chars of lowercase letters and digits 2-7")
+var ErrInvalidTunnelID = errors.New("invalid tunnel id")
 
 var ErrInvalidTunnelDescription = errors.New("invalid tunnel description: only Chinese characters, letters, digits, length 0-64")
 

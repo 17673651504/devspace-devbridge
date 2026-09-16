@@ -43,7 +43,6 @@ func buildWSHeader(jwtToken, apiKey string) (http.Header, []string) {
 		header.Set("X-API-Key", apiKey)
 	}
 	if jwtToken != "" {
-		header.Set("Sec-WebSocket-Protocol", subprotocolDevBridge+", "+jwtToken)
 		subprotocols = append(subprotocols, jwtToken)
 	}
 	return header, subprotocols

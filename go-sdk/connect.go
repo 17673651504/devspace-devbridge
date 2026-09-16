@@ -74,9 +74,6 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 		if ctx.Err() != nil {
 			return nil
 		}
-		if err == nil {
-			return nil
-		}
 		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
 			d.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
 			return err
