@@ -47,7 +47,7 @@ builds:
       - -X huawei.com/devbridge/internal/auth.LoginURL=https://devstation.ulanqab.huawei.com
       - -X huawei.com/devbridge/internal/config.DefaultServerDomain=https://100.85.118.163:8443
       - -X huawei.com/devbridge/internal/config.ServerAddr=100.85.117.75:443
-      - -X huawei.com/devbridge/internal/config.ServerHost=hwtunnel.com
+      - -X huawei.com/devbridge/internal/config.ServerHost=devbridge-s2.hwtunnel.com
     flags:
       - -trimpath
     buildmode: pie

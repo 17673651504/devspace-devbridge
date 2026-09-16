@@ -5,10 +5,10 @@
 package config
 
 // ServerAddr is the WebSocket gateway address (host:port), injected via ldflags.
-var ServerAddr = "gateway.hwtunnel.com"
+var ServerAddr = "gateway.devbridge-s2.hwtunnel.com"
 
 // ServerHost is the WebSocket gateway SNI host, injected via ldflags.
-var ServerHost = "hwtunnel.com"
+var ServerHost = "devbridge-s2.hwtunnel.com"
 
 // ResolveGatewayAddr returns the WebSocket gateway address.
 // Config file gateway-addr takes precedence over the ldflags-injected default.
