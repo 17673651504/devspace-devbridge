@@ -101,6 +101,7 @@ func (d *Devbridge) dialWithRetry(ctx context.Context, url string, opts *websock
 
 		// 409 Conflict: this tunnel already has a host
 		if resp != nil && resp.StatusCode == http.StatusConflict {
+			_ = resp.Body.Close()
 			return nil, ErrDuplicateHost
 		}
 
