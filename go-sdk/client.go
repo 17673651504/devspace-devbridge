@@ -120,6 +120,13 @@ func validateTunnelID(id string) error {
 	return nil
 }
 
+func validateTunnelName(name string) error {
+	if !tunnelNameRegexp.MatchString(name) {
+		return fmt.Errorf("%w: got %q", ErrInvalidTunnelName, name)
+	}
+	return nil
+}
+
 func validateTunnelDescription(description string) error {
 	if !tunnelDescRegexp.MatchString(description) {
 		return fmt.Errorf("%w: got %q", ErrInvalidTunnelDescription, description)
