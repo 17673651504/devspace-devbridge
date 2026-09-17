@@ -62,7 +62,7 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 	sniHost := cfg.TunnelID + "." + d.gatewayHost
 	wsURL := "wss://" + sniHost + "/"
 
-	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, d.statusWriter, d.logger)
+	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, d.outputWriter, d.logger)
 
 	const maxReconnectAttempts = 5
 	const baseReconnectDelay = 3 * time.Second
@@ -179,17 +179,17 @@ type listenerFactory struct {
 	expectedCount      int
 	allReceived        chan struct{}
 	localIP            string
-	statusWriter       io.Writer
+	outputWriter       io.Writer
 	logger             *slog.Logger
 }
 
-func newListenerFactory(expectedCount int, localIP string, statusWriter io.Writer, logger *slog.Logger) *listenerFactory {
+func newListenerFactory(expectedCount int, localIP string, outputWriter io.Writer, logger *slog.Logger) *listenerFactory {
 	return &listenerFactory{
 		expectedCount: expectedCount,
 		allReceived:   make(chan struct{}),
 		portOverrides: make(map[int]int),
 		localIP:       localIP,
-		statusWriter:  statusWriter,
+		outputWriter:  outputWriter,
 		logger:        logger,
 	}
 }
@@ -260,7 +260,7 @@ func (f *listenerFactory) printForwardings() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, msg := range f.pendingForwardings {
-		fmt.Fprint(f.statusWriter, msg)
+		fmt.Fprint(f.outputWriter, msg)
 	}
 }
 
