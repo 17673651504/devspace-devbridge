@@ -75,7 +75,7 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 			return nil
 		}
 		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
-			d.logger.Error("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
+			d.logger.Debug("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
 			return err
 		}
 		if connected {
@@ -84,7 +84,7 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 			consecutiveFailures++
 		}
 		if consecutiveFailures >= maxReconnectAttempts {
-			d.logger.Error("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
+			d.logger.Debug("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
 			return fmt.Errorf("reconnect failed after %d attempts: %w", maxReconnectAttempts, err)
 		}
 
