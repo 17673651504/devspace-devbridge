@@ -80,53 +80,31 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 	sniHost := cfg.TunnelID + "." + d.gatewayHost
 	wsURL := "wss://" + sniHost + "/" + cfg.TunnelID
 
-	const maxReconnectAttempts = 5
-	const baseReconnectDelay = 3 * time.Second
-	const maxReconnectDelay = 30 * time.Second
-
-	consecutiveFailures := 0
 	everConnected := false
-
-	for consecutiveFailures < maxReconnectAttempts {
-		connected, err := d.runHostSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, cfg.OnReady)
-		if ctx.Err() != nil {
-			return nil
-		}
-		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
-			d.logger.Debug("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
-			return err
-		}
-		if errors.Is(err, ErrDuplicateHost) && !everConnected {
-			d.logger.Error("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
-			return err
-		}
-		if connected {
-			consecutiveFailures = 0
+	return d.reconnectLoop(ctx, func() (bool, error) {
+		return d.runHostSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, cfg.OnReady)
+	}, reconnectDecision{
+		// 网关明确拒绝（额度超限/隧道不存在）或首次连接前就报重复 host：直接终止，不重试。
+		// 注意：onConnected 在 shouldStop 之后才执行，因此此处的 everConnected 是上一次会话的值，
+		// 与原实现“先判断 duplicate、后更新 everConnected”的语义完全一致。
+		shouldStop: func(err error) bool {
+			if errors.Is(err, ErrDuplicateHost) && !everConnected {
+				d.logger.Error("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
+				return true
+			}
+			if gatewayRejectedError(err) {
+				d.logger.Debug("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
+				return true
+			}
+			return false
+		},
+		onReconnect: func(err error) {
+			d.statusln("Connection lost, reconnecting...")
+		},
+		onConnected: func() {
 			everConnected = true
-		} else {
-			consecutiveFailures++
-		}
-		if consecutiveFailures >= maxReconnectAttempts {
-			d.logger.Debug("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
-			return fmt.Errorf("reconnect failed after %d attempts: %w", maxReconnectAttempts, err)
-		}
-
-		shift := consecutiveFailures - 1
-		if shift > 4 {
-			shift = 4
-		}
-		delay := baseReconnectDelay << uint(shift)
-		if delay > maxReconnectDelay {
-			delay = maxReconnectDelay
-		}
-		d.statusln("Connection lost, reconnecting...")
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-time.After(delay):
-		}
-	}
-	return nil
+		},
+	})
 }
 
 func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, onReady func([]int)) (connected bool, err error) {

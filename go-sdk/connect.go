@@ -6,7 +6,6 @@ package sdk
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -64,46 +63,21 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 
 	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, d.outputWriter, d.logger)
 
-	const maxReconnectAttempts = 5
-	const baseReconnectDelay = 3 * time.Second
-	const maxReconnectDelay = 30 * time.Second
-
-	consecutiveFailures := 0
-	for consecutiveFailures < maxReconnectAttempts {
-		connected, err := d.runConnectSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, factory, cfg.OnReady)
-		if ctx.Err() != nil {
-			return nil
-		}
-		if errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrTunnelNotFound) {
-			d.logger.Debug("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
-			return err
-		}
-		if connected {
-			consecutiveFailures = 0
-		} else {
-			consecutiveFailures++
-		}
-		if consecutiveFailures >= maxReconnectAttempts {
-			d.logger.Debug("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
-			return fmt.Errorf("reconnect failed after %d attempts: %w", maxReconnectAttempts, err)
-		}
-
-		delay := baseReconnectDelay
-		for i := 0; i < consecutiveFailures-1; i++ {
-			delay *= 2
-			if delay >= maxReconnectDelay {
-				delay = maxReconnectDelay
-				break
+	return d.reconnectLoop(ctx, func() (bool, error) {
+		return d.runConnectSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, factory, cfg.OnReady)
+	}, reconnectDecision{
+		// 网关明确拒绝（额度超限/隧道不存在）：直接终止，不重试。
+		shouldStop: func(err error) bool {
+			if gatewayRejectedError(err) {
+				d.logger.Debug("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
+				return true
 			}
-		}
-		d.statusf("Connection lost, reconnecting... (%v)\n", err)
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-time.After(delay):
-		}
-	}
-	return nil
+			return false
+		},
+		onReconnect: func(err error) {
+			d.statusf("Connection lost, reconnecting... (%v)\n", err)
+		},
+	})
 }
 
 func (d *Devbridge) runConnectSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, factory *listenerFactory, onReady func([]Forwarding)) (connected bool, err error) {
