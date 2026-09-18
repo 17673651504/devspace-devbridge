@@ -35,6 +35,7 @@ type CheckResult struct {
 	LatestVersion string `json:"latestVersion"`
 	LatestTag     string `json:"latestTag"`
 	CheckedAt     int64  `json:"checkedAt"`
+	LastNotifyAt  int64  `json:"lastNotifyAt"`
 }
 
 // gitcodeRelease represents a single release from the GitCode API.
@@ -216,4 +217,42 @@ func InstallCommand() string {
 	}
 	return fmt.Sprintf("  # GitCode\n  curl -fsSL %s | bash\n\n  # GitHub\n  curl -fsSL https://github.com/huaweicloud/devspace-devbridge/releases/latest/download/install.sh | bash",
 		gitCodeInstallSh)
+}
+
+// CheckSync checks for a newer version and prints the notice every time.
+// Used by the `version` command, which must always report synchronously.
+func CheckSync(version string) {
+	result := Check()
+	if result == nil {
+		return
+	}
+	if IsNewer(version, result.LatestVersion) {
+		printUpdateNotice(result.LatestVersion, version)
+	}
+}
+
+// CheckAsync checks for a newer version and prints the notice at most once per
+// cacheTTL (24h) across processes, gated by a persisted LastNotifyAt.
+// Used by every normal command via PersistentPreRun.
+func CheckAsync(version string) {
+	result := Check()
+	if result == nil {
+		return
+	}
+	if !IsNewer(version, result.LatestVersion) {
+		return
+	}
+	ttlSeconds := int64(cacheTTL / time.Second)
+	now := time.Now().Unix()
+	if result.LastNotifyAt != 0 && now-result.LastNotifyAt < ttlSeconds {
+		return // already notified within the rate-limit window
+	}
+	result.LastNotifyAt = now
+	saveCache(result)
+	printUpdateNotice(result.LatestVersion, version)
+}
+
+func printUpdateNotice(latest, version string) {
+	fmt.Fprintf(os.Stderr, "\nA new version is available: %s (current: %s)\nUpdate:\n%s\n\n",
+		latest, version, InstallCommand())
 }

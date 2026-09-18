@@ -30,7 +30,7 @@ build-test: LOGIN_URL := https://devstation.ulanqab.huawei.com
 build-test: build
 
 build-prod: VERSION := prod
-build-prod: SERVER_DOMAIN := https://devstation.myhuaweicloud.com
+build-prod: SERVER_DOMAIN := https://bridge.developer.myhuaweicloud.com
 build-prod: LOGIN_URL := https://devstation.connect.huaweicloud.com
 build-prod: GATEWAY_ADDR := gateway.devbridge-s2.hwtunnel.com:443
 build-prod: build
