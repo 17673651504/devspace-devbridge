@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"huawei.com/devbridge/internal/i18n"
-	"huawei.com/devbridge/internal/updater"
 
 	"github.com/spf13/cobra"
 )
@@ -25,13 +24,6 @@ var RootCmd = &cobra.Command{
 			level = slog.LevelDebug
 		}
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
-
-		// Version check: print update notice to stderr if a newer version is
-		// available. Normal commands notify at most once per day (CheckAsync);
-		// the version command does its own synchronous check in its Run.
-		if cmd.Name() != "version" {
-			updater.CheckAsync(version)
-		}
 	},
 }
 
@@ -41,9 +33,6 @@ var versionCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(version)
-		// Update notice goes to stderr so stdout contains only the version
-		// number, keeping CI version checks reliable. Synchronous: prints every time.
-		updater.CheckSync(version)
 	},
 }
 
