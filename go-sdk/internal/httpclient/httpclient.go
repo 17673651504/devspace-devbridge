@@ -11,7 +11,6 @@ package httpclient
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -63,9 +62,6 @@ func New(apiKey, baseURL string, logger *slog.Logger) *Client {
 		BaseURL: baseURL,
 		HTTP: &http.Client{
 			Timeout: 30 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
 		},
 		Logger: logger,
 	}

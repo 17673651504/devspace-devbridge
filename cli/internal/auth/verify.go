@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"log/slog"
@@ -24,9 +23,6 @@ var errAPIKeyInvalid = errors.New("api key is invalid or disabled")
 
 var verifyClient = &http.Client{
 	Timeout: 10 * time.Second,
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	},
 }
 
 // VerifyAPIKey 校验 API Key 有效性，返回 204 表示有效。
