@@ -74,6 +74,24 @@ var (
 
 const relayChannelType = "relay"
 
+// allPortsSentinel 是“全端口”哨兵值（-1）。全端口隧道只影响访客 URL 访问，
+// 不参与 SSH 端口转发，因此转发前须过滤掉 -1（-1 不是合法的监听端口）。
+const allPortsSentinel = -1
+
+// filterForwardPorts 过滤掉“全端口”哨兵值（-1），只返回真实端口（1-65535）。
+// host/connect 的 SSH 端口转发绝不能转发 -1（哨兵值映射到 uint32 4294967295，非法监听端口），
+// -1 只用于访客 URL 访问任意端口。
+func filterForwardPorts(ports []int) []int {
+	out := make([]int, 0, len(ports))
+	for _, p := range ports {
+		if p == allPortsSentinel {
+			continue
+		}
+		out = append(out, p)
+	}
+	return out
+}
+
 var sessionLookup = make(map[uint32]*ssh.ServerSession)
 
 var persistentHostKey ssh.KeyPair

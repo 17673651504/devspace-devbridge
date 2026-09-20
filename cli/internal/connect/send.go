@@ -197,13 +197,17 @@ func runSendSession(ctx context.Context, wsURL string, sniHost string, header ht
 
 	fmt.Printf("Connected to tunnel: %s\n", tunnelID)
 
-	if len(ports) > 0 {
+	realPorts := filterForwardPorts(ports)
+
+	if len(realPorts) > 0 {
 		fmt.Println("Mode: active forwarding (ports from API)")
+	} else if len(ports) > 0 {
+		fmt.Printf("All ports mode: access via URL instead, e.g. https://%s-<port>.%s\n", tunnelID, ServerHost)
 	} else {
 		fmt.Println("Mode: passive forwarding (ports from host via SSH)")
 	}
 
-	if len(ports) > 0 {
+	if len(realPorts) > 0 {
 		factory.waitForForwardings(3 * time.Second)
 	} else {
 		factory.waitForForwardings(2 * time.Second)

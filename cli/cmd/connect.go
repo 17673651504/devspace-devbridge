@@ -13,7 +13,7 @@ import (
 	client "huawei.com/devbridge/internal/connect"
 )
 
-var hostPorts []uint
+var hostPorts []int
 var hostDescription string
 var hostExpiration int
 var connectToken string
@@ -33,29 +33,24 @@ func validateTunnelID(id string) error {
 	return nil
 }
 
-func portsToInt(ports []uint) []int {
-	result := make([]int, len(ports))
-	for i, p := range ports {
-		result[i] = int(p)
-	}
-	return result
-}
-
 func portResultsToInt(results []api.ListPortsResult) []int {
 	ports := make([]int, len(results))
 	for i, p := range results {
-		ports[i] = int(p.Port)
+		ports[i] = p.Port
 	}
 	return ports
 }
 
-func validatePorts(ports []uint) error {
+func validatePorts(ports []int) error {
 	if len(ports) == 0 {
 		return fmt.Errorf("at least one port must be specified via -p/--ports")
 	}
 	for _, p := range ports {
-		if p == 0 || p > 65535 {
-			return fmt.Errorf("invalid port number: %d (valid range: 1-65535)", p)
+		if p == -1 {
+			continue
+		}
+		if p < 1 || p > 65535 {
+			return fmt.Errorf("invalid port number: %d (valid range: 1-65535, or -1 for all ports)", p)
 		}
 	}
 	return nil
@@ -135,7 +130,7 @@ func resolveHostTunnelPorts(cmd *cobra.Command, args []string) (tunnelID string,
 	if err := validatePorts(hostPorts); err != nil {
 		return "", nil, err
 	}
-	ports = portsToInt(hostPorts)
+	ports = hostPorts
 
 	slog.Debug("Creating new tunnel", "ports", ports)
 	var exp *int
@@ -247,7 +242,7 @@ var connectCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(hostCmd)
 	RootCmd.AddCommand(connectCmd)
-	hostCmd.Flags().UintSliceVarP(&hostPorts, "ports", "p", nil, "Local server port numbers")
+	hostCmd.Flags().IntSliceVarP(&hostPorts, "ports", "p", nil, "Local server port numbers (use -1 for all ports)")
 	hostCmd.Flags().StringVarP(&hostDescription, "description", "d", "", "Description for new tunnel")
 	hostCmd.Flags().IntVarP(&hostExpiration, "expiration", "e", 0,
 		"Tunnel expiration (hours, 1-720)")
