@@ -173,10 +173,15 @@ func startAcceptLoop(ctx context.Context, outerSession *ssh.ClientSession, tunne
 }
 
 func printListenReady(ports []int, tunnelID string) {
-	for _, p := range ports {
+	realPorts := filterForwardPorts(ports)
+	if len(realPorts) == 0 && len(ports) > 0 {
+		fmt.Println("All ports mode: this tunnel accepts any port via URL")
+		fmt.Printf("Access your service at: https://%s-<port>.%s\n", tunnelID, ServerHost)
+	}
+	for _, p := range realPorts {
 		fmt.Printf("Hosting port: %s%d%s\n", colorCyan, p, colorReset)
 	}
-	for _, p := range ports {
+	for _, p := range realPorts {
 		fmt.Printf("Tunnel URL: https://%s-%d.%s\n", tunnelID, p, ServerHost)
 	}
 	fmt.Println("Ready to accept connections")
@@ -253,7 +258,7 @@ func handleRelayChannel(ctx context.Context, channel *ssh.Channel, tunnelID stri
 
 	pfs := tcp.GetPortForwardingService(&innerSession.Session)
 	if pfs != nil && len(ports) > 0 {
-		for _, port := range ports {
+		for _, port := range filterForwardPorts(ports) {
 			if _, err := pfs.ForwardFromRemotePort(ctx, "127.0.0.1", port, "127.0.0.1", port); err != nil {
 				slog.Error("forward port failed", "port", port, "err", err)
 			}
