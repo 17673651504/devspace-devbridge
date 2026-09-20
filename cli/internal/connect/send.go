@@ -179,6 +179,13 @@ func runSendSession(ctx context.Context, wsURL string, sniHost string, header ht
 
 	session := ssh.NewClientSession(config)
 	session.Trace = traceFunc()
+	session.OnKeepAliveFailed = func(count int) {
+		slog.Debug("keepalive failed", "count", count)
+		if count >= 5 {
+			slog.Error("keepalive failed 5 times, forcing reconnect", "tunnelID", tunnelID)
+			_ = session.Close()
+		}
+	}
 	defer func() { _ = session.Close() }()
 
 	pfs := tcp.GetPortForwardingService(&session.Session)
