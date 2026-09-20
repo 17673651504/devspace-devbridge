@@ -89,7 +89,7 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 		// 与原实现“先判断 duplicate、后更新 everConnected”的语义完全一致。
 		shouldStop: func(err error) bool {
 			if errors.Is(err, ErrDuplicateHost) && !everConnected {
-				d.logger.Error("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
+				d.logger.Debug("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
 				return true
 			}
 			if gatewayRejectedError(err) {
@@ -110,6 +110,9 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, onReady func([]int)) (connected bool, err error) {
 	netConn, err := d.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
 	if err != nil {
+		if errors.Is(err, ErrDuplicateHost) {
+			return false, fmt.Errorf("outer SSH connect failed: %w", err)
+		}
 		return false, err
 	}
 	defer func() { _ = netConn.Close() }()

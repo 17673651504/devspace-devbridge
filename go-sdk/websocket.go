@@ -173,8 +173,10 @@ func sshTraceFunc(logger *slog.Logger) ssh.TraceFunc {
 }
 
 // parseSSHCloseError extracts a typed business error from a WebSocket close
-// error. The gateway signals business errors via application close codes
-// (4000-4999) so the reason text is never parsed.
+// error. Two wire formats are recognised:
+//   - application close codes 4001/4002/4003 (designed protocol)
+//   - close code 1008 (StatusPolicyViolation) carrying a reason text, which is
+//     what the gateway currently sends before the application codes land
 func parseSSHCloseError(err error) error {
 	var ce websocket.CloseError
 	if !errors.As(err, &ce) {
@@ -187,6 +189,15 @@ func parseSSHCloseError(err error) error {
 		return ErrTunnelNotFound
 	case closeCodeDuplicateHost:
 		return ErrDuplicateHost
+	case websocket.StatusPolicyViolation:
+		switch ce.Reason {
+		case "account quota exceeded":
+			return ErrQuotaExceeded
+		case "tunnel not found":
+			return ErrTunnelNotFound
+		case "tunnel already registered":
+			return ErrDuplicateHost
+		}
 	}
 	return err
 }
