@@ -46,6 +46,7 @@ builds:
       - -X huawei.com/devbridge/internal/config.DefaultServerDomain=https://bridge.developer.myhuaweicloud.com
       - -X huawei.com/devbridge/internal/connect.ServerAddr=gateway.cn-north-4-bridge.myhuaweicloud.com:443
       - -X huawei.com/devbridge/internal/connect.ServerHost=cn-north-4-bridge.myhuaweicloud.com
+      - -X huawei.com/devbridge/internal/api.ClusterID=cn-north-4-bridge
     flags:
       - -trimpath
     buildmode: pie
