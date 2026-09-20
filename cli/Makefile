@@ -34,8 +34,9 @@ build-test: build
 build-prod: VERSION := prod
 build-prod: SERVER_DOMAIN := https://devstation.myhuaweicloud.com
 build-prod: LOGIN_URL := https://devstation.connect.huaweicloud.com
-build-prod: GATEWAY_ADDR := gateway.cn-north-4-bridge.myhuaweicloud.com:443
-build-prod: CLUSTER_ID := cn-north-4-bridge
+build-prod: GATEWAY_ADDR := gateway.devbridge-s2.hwtunnel.com:443
+build-prod: CLUSTER_DOMAIN := devbridge-s2.hwtunnel.com
+build-prod: CLUSTER_ID := devbridge-s2
 build-prod: build
 
 # 跨平台构建: 产物名含版本号（与 install.sh 对齐: devbridge_{OS}_{Arch}_{Version}）
