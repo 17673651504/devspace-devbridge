@@ -40,6 +40,11 @@ on:
     tags:
       - "go-sdk/v*"
   workflow_dispatch:
+    inputs:
+      version:
+        description: '手动测试发布时的版本号（如 v0.2.0-test.1，留空则跳过发布）'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -76,7 +81,7 @@ jobs:
   publish-gitcode:
     runs-on: ubuntu-latest
     needs: build
-    if: startsWith(github.ref, 'refs/tags/go-sdk/')
+    if: startsWith(github.ref, 'refs/tags/go-sdk/') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
     permissions:
       contents: read
     env:
@@ -89,8 +94,12 @@ jobs:
 
       - name: Package SDK source
         run: |
-          # go-sdk/v0.2.1 -> v0.2.1
-          SDK_VERSION="${GITHUB_REF_NAME#go-sdk/}"
+          # tag: go-sdk/v0.2.1 -> v0.2.1 ; 手动触发用 inputs.version
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SDK_VERSION="${{ inputs.version }}"
+          else
+            SDK_VERSION="${GITHUB_REF_NAME#go-sdk/}"
+          fi
           echo "SDK_VERSION=${SDK_VERSION}" >> "$GITHUB_ENV"
           mkdir -p dist
           git archive --format=tar.gz --prefix="devbridge-go-sdk-${SDK_VERSION}/" \
