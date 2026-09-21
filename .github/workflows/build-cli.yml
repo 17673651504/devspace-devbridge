@@ -203,3 +203,4 @@ jobs:
             cli/dist-extra/install.sh
             cli/dist-extra/install.ps1
           if-no-files-found: warn
+# re-register: 触发 GitHub 重新扫描并注册本 workflow（2026-09-21）
