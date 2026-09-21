@@ -150,7 +150,7 @@ func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost st
 		closedArgsMu.Lock()
 		closedArgs = args
 		closedArgsMu.Unlock()
-		d.logger.Warn("host: session closed (diagnostic)",
+		d.logger.Debug("host: session closed (diagnostic)",
 			"tunnelID", tunnelID,
 			"reason", args.Reason,
 			"message", args.Message,
@@ -227,10 +227,10 @@ func (d *Devbridge) logDiagnosticClose(tunnelID string, mu *sync.Mutex, args **s
 	a := *args
 	mu.Unlock()
 	if a == nil {
-		d.logger.Error("host connection lost (no close event captured)", "tunnelID", tunnelID)
+		d.logger.Debug("host connection lost (no close event captured)", "tunnelID", tunnelID)
 		return
 	}
-	d.logger.Error("host connection lost",
+	d.logger.Debug("host connection lost",
 		"tunnelID", tunnelID,
 		"reason", a.Reason,
 		"message", a.Message,
@@ -338,11 +338,12 @@ func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel
 		}
 	}
 
-	go func(chID uint32) {
+	go func() {
+		defer func() { _ = innerSession.Close() }()
 		for {
 			if _, err := innerSession.AcceptChannel(ctx); err != nil {
 				return
 			}
 		}
-	}(channel.ChannelID)
+	}()
 }
