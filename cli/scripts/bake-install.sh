@@ -5,7 +5,7 @@
 # 将版本号和下载地址注入 install.sh / install.ps1，按渠道输出到 dist-extra/：
 #
 #   dist-extra/install.sh / install.ps1      — GitHub 渠道（指向 GitHub Release）
-#   dist-extra/obs/install.sh / install.ps1  — OBS 渠道（指向 OBS 版本化目录）
+#   dist-extra/obs/install.sh / install.ps1  — OBS 渠道（指向 OBS 平铺目录）
 #
 # GitCode 渠道无需单独烤制：post-release.sh 上传时由
 # upload-gitcode-release.sh 重烤为 GitCode 地址。
@@ -16,7 +16,7 @@
 # 示例:
 #   ./scripts/bake-install.sh 1.0.0-release \
 #     "https://github.com/huaweicloud/devspace-devbridge/releases/download/1.0.0-release" \
-#     "https://tools-artifact.developer.huaweicloud.com/sharedata/devbridge/releases/download/1.0.0-release"
+#     "https://tools-artifact.developer.huaweicloud.com/sharedata/devbridge"
 #
 # 产物:
 #   dist-extra/install.sh / install.ps1   — GitHub 渠道
