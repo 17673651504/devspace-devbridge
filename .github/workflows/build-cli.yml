@@ -11,11 +11,10 @@
 # 手动触发:
 #   inputs.version       版本号（留空则 git describe --tags --always）
 #   inputs.env           环境 test/prod（默认 prod）
-#   inputs.gitcode_token GitCode 个人访问令牌（留空则跳过 GitCode 上传）
 #
 # 发布逻辑:
 #   PR 触发            → 仅编译验证，不发布
-#   版本号包含 "release" → goreleaser release（发布 GitHub Release）+ 上传 GitCode Release
+#   版本号包含 "release" → goreleaser release（发布 GitHub Release）
 #   版本号不含 "release" → goreleaser release --skip=publish（构建打包存 artifact，不发布）
 #
 # Release 附件（GoReleaser 自动管理）:
@@ -25,12 +24,6 @@
 #
 # 发布目标:
 #   GitHub:  https://github.com/<repo>/releases/download/<Version>/install.sh
-#   GitCode: https://gitcode.com/CloudDeveloperDepartment/devbrige/releases/<Version>
-#
-# 注意:
-#   gitcode_token 通过 workflow input 传入（因仓库 Write 权限无法配 Secret）。
-#   该值会出现在 workflow run 的 Inputs 面板中，有仓库 Read 权限的人可见。
-#   如后续获得 Admin 权限，建议改用 repository secret 更安全。
 # =============================================================================
 name: Build CLI
 
@@ -49,10 +42,6 @@ on:
         default: 'prod'
         type: choice
         options: [test, prod]
-      gitcode_token:
-        description: 'GitCode 令牌（留空则跳过 GitCode 上传）'
-        required: false
-        default: ''
 
 permissions:
   contents: write
@@ -161,16 +150,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           goreleaser release --clean --config ${{ steps.meta.outputs.config }}
-
-      # ---- 上传到 GitCode Release（release 版本 + 提供了 token 才执行）----
-      # after.hooks 是 GoReleaser Pro 功能，OSS 版用 workflow 步骤替代
-      - name: Upload to GitCode
-        if: steps.meta.outputs.is_release == 'true' && inputs.gitcode_token != ''
-        working-directory: cli
-        env:
-          GITCODE_TOKEN: ${{ inputs.gitcode_token }}
-        run: |
-          ./scripts/post-release.sh ${{ steps.meta.outputs.version }}
 
       # ---- 验证注入生效：跑一下 linux 产物，打印内嵌版本号 ----
       - name: Verify injected version
