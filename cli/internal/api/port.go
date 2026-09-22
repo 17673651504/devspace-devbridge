@@ -24,8 +24,12 @@ type updatePortRequest struct {
 	AllowAnonymous *bool `json:"allowAnonymous,omitempty"`
 }
 
+// AllPortsSentinel 是“全端口”哨兵值，对应后端的 -1。
+// 全端口隧道可被任意端口 URL 访问，只影响访客 URL 访问，不参与 SSH 端口转发。
+const AllPortsSentinel = -1
+
 type ListPortsResult struct {
-	Port           uint16 `json:"port"`
+	Port           int    `json:"port"`
 	Protocol       string `json:"protocol"`
 	AllowAnonymous bool   `json:"allowAnonymous"`
 	TunnelID       string `json:"tunnelId"`
@@ -33,12 +37,15 @@ type ListPortsResult struct {
 
 type ShowPortResult struct {
 	TunnelID       string `json:"tunnelId"`
-	Port           uint16 `json:"port"`
+	Port           int    `json:"port"`
 	Protocol       string `json:"protocol"`
 	AllowAnonymous bool   `json:"allowAnonymous"`
 }
 
 func validatePortNumber(port int) error {
+	if port == AllPortsSentinel {
+		return nil
+	}
 	if port < 1 || port > 65535 {
 		return fmt.Errorf("%s", i18n.T(i18n.Msg.Port.PortInvalid))
 	}

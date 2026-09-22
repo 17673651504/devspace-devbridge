@@ -24,6 +24,9 @@ const (
 	tunnelTokenPath      = "/tunnels/%s/token"
 )
 
+// ClusterID 集群标识，默认与 ServerHost 子域前缀对应，可通过 ldflags 注入.
+var ClusterID = "devbridge-s2"
+
 type createTunnelRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
@@ -96,7 +99,7 @@ func CreateTunnel(name, description string, expiration *int) (*CreateTunnelResul
 	if !tunnelDescRegexp.MatchString(description) {
 		return nil, errors.New(i18n.T(i18n.Msg.Tunnel.TunnelDescInvalid))
 	}
-	req := createTunnelRequest{Name: name, Description: description, ClusterID: "cn-north-4-bridge"}
+	req := createTunnelRequest{Name: name, Description: description, ClusterID: ClusterID}
 	if expiration != nil {
 		if *expiration < 1 || *expiration > 720 {
 			return nil, errors.New(i18n.T(i18n.Msg.Tunnel.TunnelExpInvalid))
