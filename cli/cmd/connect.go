@@ -71,7 +71,7 @@ func resolveHostConfig(cmd *cobra.Command, args []string) (tunnelID string, port
 		client := newSDKClient()
 		tokenResult, err := client.IssueToken(context.Background(), tunnelID, "host")
 		if err != nil {
-			return "", nil, "", fmt.Errorf("Failed to get host token: %w", err)
+			return "", nil, "", fmt.Errorf("failed to get host token: %w", err)
 		}
 		jwtToken = tokenResult.Token
 	}
@@ -86,11 +86,11 @@ func resolveHostTunnelPorts(cmd *cobra.Command, args []string) (tunnelID string,
 		tunnelID = args[0]
 		portsResult, err := client.ListPorts(context.Background(), tunnelID)
 		if err != nil {
-			return "", nil, fmt.Errorf("Failed to list ports: %w", err)
+			return "", nil, fmt.Errorf("failed to list ports: %w", err)
 		}
 		ports = portResultsToInt(portsResult)
 		if len(ports) == 0 {
-			return "", nil, fmt.Errorf("No ports configured for tunnel %s", tunnelID)
+			return "", nil, fmt.Errorf("no ports configured for tunnel %s", tunnelID)
 		}
 		return tunnelID, ports, nil
 	}
@@ -104,11 +104,11 @@ func resolveHostTunnelPorts(cmd *cobra.Command, args []string) (tunnelID string,
 		tunnelID = defaultID
 		portsResult, err := client.ListPorts(context.Background(), tunnelID)
 		if err != nil {
-			return "", nil, fmt.Errorf("Failed to list ports: %w", err)
+			return "", nil, fmt.Errorf("failed to list ports: %w", err)
 		}
 		ports = portResultsToInt(portsResult)
 		if len(ports) == 0 {
-			return "", nil, fmt.Errorf("No ports configured for tunnel %s", tunnelID)
+			return "", nil, fmt.Errorf("no ports configured for tunnel %s", tunnelID)
 		}
 		return tunnelID, ports, nil
 	}
@@ -128,7 +128,7 @@ func resolveHostTunnelPorts(cmd *cobra.Command, args []string) (tunnelID string,
 		fmt.Sprintf("tunnel-%d-%d", ports[0], time.Now().UnixMilli()%10000),
 		hostDescription, exp)
 	if err != nil {
-		return "", nil, fmt.Errorf("Failed to create tunnel: %w", err)
+		return "", nil, fmt.Errorf("failed to create tunnel: %w", err)
 	}
 	tunnelID = result.ID
 	fmt.Printf("Created tunnel: %s\n", tunnelID)
@@ -136,7 +136,7 @@ func resolveHostTunnelPorts(cmd *cobra.Command, args []string) (tunnelID string,
 	allowAnon := true
 	for _, p := range ports {
 		if err := client.CreatePort(context.Background(), tunnelID, p, "auto", &allowAnon); err != nil {
-			return "", nil, fmt.Errorf("Failed to create port %d for tunnel %s: %w", p, tunnelID, err)
+			return "", nil, fmt.Errorf("failed to create port %d for tunnel %s: %w", p, tunnelID, err)
 		}
 	}
 	return
@@ -183,17 +183,17 @@ func resolveConnectConfig(args []string) (tunnelID string, ports []int, jwtToken
 	client := newSDKClient()
 	portsResult, err := client.ListPorts(context.Background(), tunnelID)
 	if err != nil {
-		return "", nil, "", fmt.Errorf("Failed to list ports: %w", err)
+		return "", nil, "", fmt.Errorf("failed to list ports: %w", err)
 	}
 	if len(portsResult) == 0 {
-		return "", nil, "", fmt.Errorf("No ports configured for tunnel %s", tunnelID)
+		return "", nil, "", fmt.Errorf("no ports configured for tunnel %s", tunnelID)
 	}
 	ports = portResultsToInt(portsResult)
 
 	if connectAPIKey == "" {
 		tokenResult, err := client.IssueToken(context.Background(), tunnelID, "connect")
 		if err != nil {
-			return "", nil, "", fmt.Errorf("Failed to get connect token: %w", err)
+			return "", nil, "", fmt.Errorf("failed to get connect token: %w", err)
 		}
 		jwtToken = tokenResult.Token
 	}

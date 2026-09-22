@@ -25,7 +25,7 @@ var validProtocols = map[string]bool{
 
 func validateProtocolLocal(protocol string) error {
 	if !validProtocols[protocol] {
-		return fmt.Errorf("Protocol must be one of http, https, auto, got: %s", protocol)
+		return fmt.Errorf("protocol must be one of http, https, auto, got: %s", protocol)
 	}
 	return nil
 }
@@ -68,7 +68,7 @@ var portCreateCmd = &cobra.Command{
 		}
 		client := newSDKClient()
 		if err := client.CreatePort(context.Background(), tunnelID, portNumber, portProtocol, allowAnon); err != nil {
-			return fmt.Errorf("Failed to add port %d: %w", portNumber, err)
+			return fmt.Errorf("failed to add port %d: %w", portNumber, err)
 		}
 		fmt.Println(i18n.T(i18n.Msg.Port.PortCreated))
 		return nil
@@ -166,7 +166,7 @@ var portDeleteCmd = &cobra.Command{
 		}
 		client := newSDKClient()
 		if err := client.DeletePort(context.Background(), tunnelID, portNumber); err != nil {
-			return fmt.Errorf("Failed to delete port %d: %w", portNumber, err)
+			return fmt.Errorf("failed to delete port %d: %w", portNumber, err)
 		}
 		fmt.Printf("Port %d removed from tunnel %s.\n", portNumber, tunnelID)
 		return nil

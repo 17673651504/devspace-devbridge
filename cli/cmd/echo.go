@@ -30,7 +30,7 @@ var echoCmd = &cobra.Command{
 	RunE: runError(func(cmd *cobra.Command, args []string) error {
 
 		if cmd.Flags().Changed("port") && (echoPort < 1 || echoPort > 65535) {
-			return fmt.Errorf("Invalid port number %d (Port must be between 1 and 65535)", echoPort)
+			return fmt.Errorf("invalid port number %d (port must be between 1 and 65535)", echoPort)
 		}
 		listenAddr := fmt.Sprintf("%s:%d", echoInterface, echoPort)
 		return runHTTPEcho(listenAddr)
