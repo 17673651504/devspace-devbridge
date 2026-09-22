@@ -158,26 +158,20 @@ func (d *Devbridge) dialWithRetry(ctx context.Context, url string, opts *websock
 	return nil, fmt.Errorf("websocket dial failed after %d retries: %w", maxRetries, lastErr)
 }
 
-// sshTraceFunc returns the SSH protocol layer trace function.
+// sshTraceFunc returns a trace function that logs SSH protocol events: errors
+// at error level, everything else at debug level.
 func sshTraceFunc(logger *slog.Logger) ssh.TraceFunc {
 	if logger == nil {
 		return nil
 	}
 	return func(level ssh.TraceLevel, eventID int, message string) {
-		attrs := []slog.Attr{
+		lvl := slog.LevelDebug
+		if level == ssh.TraceLevelError {
+			lvl = slog.LevelError
+		}
+		logger.LogAttrs(context.Background(), lvl, "ssh trace",
 			slog.Int("eventID", eventID),
-			slog.String("msg", message),
-		}
-		switch level {
-		case ssh.TraceLevelError:
-			logger.LogAttrs(context.Background(), slog.LevelError, "ssh trace", attrs...)
-		case ssh.TraceLevelWarning:
-			logger.LogAttrs(context.Background(), slog.LevelDebug, "ssh trace", attrs...)
-		case ssh.TraceLevelInfo:
-			logger.LogAttrs(context.Background(), slog.LevelDebug, "ssh trace", attrs...)
-		case ssh.TraceLevelVerbose:
-			logger.LogAttrs(context.Background(), slog.LevelDebug, "ssh trace", attrs...)
-		}
+			slog.String("msg", message))
 	}
 }
 
