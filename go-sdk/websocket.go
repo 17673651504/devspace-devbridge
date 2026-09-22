@@ -172,7 +172,7 @@ func sshTraceFunc(logger *slog.Logger) ssh.TraceFunc {
 		case ssh.TraceLevelError:
 			logger.LogAttrs(context.Background(), slog.LevelError, "ssh trace", attrs...)
 		case ssh.TraceLevelWarning:
-			logger.LogAttrs(context.Background(), slog.LevelWarn, "ssh trace", attrs...)
+			logger.LogAttrs(context.Background(), slog.LevelDebug, "ssh trace", attrs...)
 		case ssh.TraceLevelInfo:
 			logger.LogAttrs(context.Background(), slog.LevelDebug, "ssh trace", attrs...)
 		case ssh.TraceLevelVerbose:
