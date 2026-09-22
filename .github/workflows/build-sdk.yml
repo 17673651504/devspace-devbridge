@@ -1,28 +1,30 @@
 # =============================================================================
-# Build and Verify DevBridge Go SDK
+# Build and verify the DevBridge Go SDK.
 #
-# SDK 的"发布"方式：打 tag 推送到 origin（如 go-sdk/v0.1.0），
-# Go module proxy（proxy.golang.org / goproxy.cn）会自动收录该版本。
-# 本 workflow 负责在 tag 推送和日常变更时校验 SDK 可编译、可测试。
+# Release is a plain tag push (e.g. go-sdk/v0.1.0); the Go module proxy
+# (proxy.golang.org / goproxy.cn) indexes it automatically. This workflow only
+# verifies the SDK builds, vets, and tests cleanly.
 #
-# 触发:
-#   pull_request          修改 go-sdk/** 时自动校验
-#   push (branches)       develop/master 分支 go-sdk/** 变更时校验
-#   push (tags go-sdk/v*)    SDK 发版 tag 推送时做发布前校验
-#   workflow_dispatch     手动触发
+# Triggers:
+#   pull_request          PR touching go-sdk/**
+#   push (branches)       develop/master changes under go-sdk/**
+#   push (tags go-sdk/v*) SDK release tag
+#   workflow_dispatch     manual
 #
-# 注意:
-#   - SDK 位于子目录，发版 tag 必须带 go-sdk/ 前缀（如 go-sdk/v0.1.0）
-#   - tag 一旦推送不可移动或删除（Go module proxy 永久缓存）
+# Notes:
+#   - The SDK lives in a subdirectory; release tags must use the go-sdk/ prefix.
+#   - Tags are immutable once pushed (the module proxy caches them forever).
 #
-# GitCode 源码归档同步（publish-gitcode 任务）:
-#   - 仅在 go-sdk/v* tag 触发时打包 go-sdk/ 源码 tar.gz + checksums.txt，
-#     通过复用 cli/scripts/upload-gitcode-release.sh 上传到 GitCode Release。
-#   - 需要配置：
-#       secrets.GITCODE_TOKEN      GitCode 访问令牌（未配置则跳过上传）
-#       vars.GITCODE_SDK_OWNER     GitCode SDK 仓库 owner（默认 CloudDeveloperDepartment）
-#       vars.GITCODE_SDK_REPO      GitCode SDK 仓库名（默认 devbridge-go-sdk，建议独立仓，避免与 CLI 分发仓 tag 冲突）
-#   - GitCode Release tag 使用去前缀后的版本号（如 go-sdk/v0.2.1 → v0.2.1）。
+# GitCode source archive (publish-gitcode job):
+#   Packs go-sdk/ source into a tar.gz + checksums.txt and uploads it to a
+#   GitCode Release via cli/scripts/upload-gitcode-release.sh, as a manual
+#   download mirror alongside the Go module proxy.
+#   Requires:
+#     secrets.GITCODE_TOKEN   GitCode token (upload skipped when unset)
+#     vars.GITCODE_SDK_OWNER  GitCode owner (default CloudDeveloperDepartment)
+#     vars.GITCODE_SDK_REPO   GitCode repo (default devbridge-go-sdk; keep it
+#                             separate from the CLI repo to avoid tag clashes)
+#   GitCode tag = version without the go-sdk/ prefix (go-sdk/v0.2.1 → v0.2.1).
 # =============================================================================
 name: Build SDK
 
@@ -56,7 +58,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # 用 go.mod 声明的版本（最低承诺的 Go 版本）做校验
+      # Use the Go version declared in go.mod.
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
@@ -75,9 +77,7 @@ jobs:
         working-directory: go-sdk
         run: go test ./...
 
-  # ---- SDK 发版时，把源码包同步归档到 GitCode Release ----
-  # 采用"源码 tar.gz + checksums.txt"方式（方案 B），与 Go module proxy 分发并行，
-  # 便于无法访问 GitHub 的环境从 GitCode 手动下载源码归档。复用 CLI 的通用上传脚本。
+  # On SDK release, archive the source to GitCode as a manual download mirror.
   publish-gitcode:
     runs-on: ubuntu-latest
     needs: build
@@ -94,7 +94,7 @@ jobs:
 
       - name: Package SDK source
         run: |
-          # tag: go-sdk/v0.2.1 -> v0.2.1 ; 手动触发用 inputs.version
+          # tag: go-sdk/v0.2.1 -> v0.2.1 ; manual dispatch uses inputs.version
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SDK_VERSION="${{ inputs.version }}"
           else
