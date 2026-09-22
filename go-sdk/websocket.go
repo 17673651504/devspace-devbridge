@@ -38,6 +38,18 @@ const (
 	colorReset  = "\033[0m"
 )
 
+// sessionParams bundles the inputs shared by a host/connect session: the
+// WebSocket dial target and handshake, plus the tunnel and ports context.
+// Grouping them avoids an unwieldy per-session function signature.
+type sessionParams struct {
+	wsURL        string
+	sniHost      string
+	header       http.Header
+	subprotocols []string
+	tunnelID     string
+	ports        []int
+}
+
 // buildWSHeader builds the WebSocket handshake header.
 //
 // Authentication is exclusive:
@@ -131,10 +143,7 @@ func (d *Devbridge) dialWithRetry(ctx context.Context, url string, opts *websock
 		}
 
 		// exponential backoff + random jitter
-		delay := baseDelay * time.Duration(1<<uint(attempt))
-		if delay > maxDelay {
-			delay = maxDelay
-		}
+		delay := min(baseDelay*time.Duration(1<<uint(attempt)), maxDelay)
 		jittered := time.Duration(rand.Int64N(int64(delay)))
 
 		d.logger.Debug("WebSocket dial retry",

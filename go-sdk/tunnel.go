@@ -9,6 +9,14 @@ import (
 	"fmt"
 )
 
+// REST API path patterns for tunnel management.
+const (
+	tunnelsPath     = "/tunnels"
+	tunnelPath      = "/tunnels/%s"
+	tunnelTokenPath = "/tunnels/%s/token?scope=%s"
+	limitsPath      = "/limits"
+)
+
 // CreateTunnel creates a tunnel; a nil expiration uses the default 72-hour validity.
 func (d *Devbridge) CreateTunnel(ctx context.Context, name, description string, expiration *int) (*Tunnel, error) {
 	if err := validateTunnelName(name); err != nil {
@@ -31,7 +39,7 @@ func (d *Devbridge) CreateTunnel(ctx context.Context, name, description string, 
 	}
 
 	var result Tunnel
-	if err := d.api.Post(ctx, "/tunnels", req, &result); err != nil {
+	if err := d.api.Post(ctx, tunnelsPath, req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -40,7 +48,7 @@ func (d *Devbridge) CreateTunnel(ctx context.Context, name, description string, 
 // ListTunnels lists the active tunnels in the current workspace.
 func (d *Devbridge) ListTunnels(ctx context.Context) ([]Tunnel, error) {
 	var result []Tunnel
-	if err := d.api.Get(ctx, "/tunnels", &result); err != nil {
+	if err := d.api.Get(ctx, tunnelsPath, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -52,7 +60,7 @@ func (d *Devbridge) ShowTunnel(ctx context.Context, tunnelID string) (*TunnelDet
 		return nil, err
 	}
 	var result TunnelDetail
-	if err := d.api.Get(ctx, fmt.Sprintf("/tunnels/%s", tunnelID), &result); err != nil {
+	if err := d.api.Get(ctx, fmt.Sprintf(tunnelPath, tunnelID), &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -84,7 +92,7 @@ func (d *Devbridge) UpdateTunnel(ctx context.Context, tunnelID string, name, des
 		req.Expiration = expiration
 	}
 
-	return d.api.Put(ctx, fmt.Sprintf("/tunnels/%s", tunnelID), req, nil)
+	return d.api.Put(ctx, fmt.Sprintf(tunnelPath, tunnelID), req, nil)
 }
 
 // DeleteTunnel deletes the specified tunnel.
@@ -92,14 +100,14 @@ func (d *Devbridge) DeleteTunnel(ctx context.Context, tunnelID string) error {
 	if err := validateTunnelID(tunnelID); err != nil {
 		return err
 	}
-	return d.api.Delete(ctx, fmt.Sprintf("/tunnels/%s", tunnelID), nil)
+	return d.api.Delete(ctx, fmt.Sprintf(tunnelPath, tunnelID), nil)
 }
 
 // DeleteAllTunnels deletes all tunnels in the current workspace.
 //
 // Use with caution: this deletes every tunnel.
 func (d *Devbridge) DeleteAllTunnels(ctx context.Context) error {
-	return d.api.Delete(ctx, "/tunnels", nil)
+	return d.api.Delete(ctx, tunnelsPath, nil)
 }
 
 // IssueToken issues a tunnel token; scope must be "host" or "connect".
@@ -112,7 +120,7 @@ func (d *Devbridge) IssueToken(ctx context.Context, tunnelID, scope string) (*Tu
 	}
 
 	var result TunnelToken
-	if err := d.api.Post(ctx, fmt.Sprintf("/tunnels/%s/token?scope=%s", tunnelID, scope), nil, &result); err != nil {
+	if err := d.api.Post(ctx, fmt.Sprintf(tunnelTokenPath, tunnelID, scope), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -121,7 +129,7 @@ func (d *Devbridge) IssueToken(ctx context.Context, tunnelID, scope string) (*Tu
 // GetLimits returns the current quota.
 func (d *Devbridge) GetLimits(ctx context.Context) (*Limits, error) {
 	var result Limits
-	if err := d.api.Get(ctx, "/limits", &result); err != nil {
+	if err := d.api.Get(ctx, limitsPath, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

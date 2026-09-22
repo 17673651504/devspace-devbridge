@@ -10,7 +10,6 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"net/http"
 	"strconv"
 	"sync"
 	"time"
@@ -62,11 +61,19 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 	wsURL := "wss://" + sniHost + "/"
 
 	factory := newListenerFactory(len(cfg.Ports), cfg.LocalIP, d.outputWriter, d.logger)
+	params := sessionParams{
+		wsURL:        wsURL,
+		sniHost:      sniHost,
+		header:       header,
+		subprotocols: subprotocols,
+		tunnelID:     cfg.TunnelID,
+		ports:        cfg.Ports,
+	}
 
 	return d.reconnectLoop(ctx, func() (bool, error) {
-		return d.runConnectSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, factory, cfg.OnReady)
+		return d.runConnectSession(ctx, params, factory, cfg.OnReady)
 	}, reconnectDecision{
-		// 网关明确拒绝（额度超限/隧道不存在）：直接终止，不重试。
+		// Gateway explicitly rejects (quota exceeded / tunnel not found): abort immediately, no retry.
 		shouldStop: func(err error) bool {
 			if gatewayRejectedError(err) {
 				d.logger.Debug("connection rejected by gateway", "tunnelID", cfg.TunnelID, "err", err)
@@ -80,8 +87,8 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 	})
 }
 
-func (d *Devbridge) runConnectSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, factory *listenerFactory, onReady func([]Forwarding)) (connected bool, err error) {
-	netConn, err := d.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
+func (d *Devbridge) runConnectSession(ctx context.Context, params sessionParams, factory *listenerFactory, onReady func([]Forwarding)) (connected bool, err error) {
+	netConn, err := d.dialWebSocket(ctx, params.wsURL, params.sniHost, params.header, params.subprotocols, 5)
 	if err != nil {
 		return false, fmt.Errorf("WebSocket connection failed: %w", err)
 	}
@@ -109,16 +116,16 @@ func (d *Devbridge) runConnectSession(ctx context.Context, wsURL string, sniHost
 	}
 	connected = true
 
-	d.statusf("Connected to tunnel: %s\n", tunnelID)
+	d.statusf("Connected to tunnel: %s\n", params.tunnelID)
 
 	// Filter out the "all ports" sentinel value (-1). Such a tunnel can only be reached by URL for any port,
 	// so the connect side does not need to create a local listener for -1.
-	realPorts := filterForwardPorts(ports)
+	realPorts := filterForwardPorts(params.ports)
 
 	if len(realPorts) > 0 {
 		d.statusln("Mode: active forwarding (ports from API)")
-	} else if len(ports) > 0 {
-		d.statusf("All ports mode: access via URL instead, e.g. https://%s-<port>.%s\n", tunnelID, d.gatewayHost)
+	} else if len(params.ports) > 0 {
+		d.statusf("All ports mode: access via URL instead, e.g. https://%s-<port>.%s\n", params.tunnelID, d.gatewayHost)
 	} else {
 		d.statusln("Mode: passive forwarding (ports from host via SSH)")
 	}

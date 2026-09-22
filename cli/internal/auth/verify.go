@@ -18,14 +18,14 @@ const (
 	headerXAPIKey = "X-API-Key"
 )
 
-// errAPIKeyInvalid 表示 API Key 无效（401）。
+// errAPIKeyInvalid indicates the API Key is invalid (401).
 var errAPIKeyInvalid = errors.New("api key is invalid or disabled")
 
 var verifyClient = &http.Client{
 	Timeout: 10 * time.Second,
 }
 
-// VerifyAPIKey 校验 API Key 有效性，返回 204 表示有效。
+// VerifyAPIKey validates the API Key; a 204 response means it is valid.
 func VerifyAPIKey(apiKey string) error {
 	if apiKey == "" {
 		return errAPIKeyInvalid

@@ -82,15 +82,8 @@ func (d *Devbridge) reconnectLoop(ctx context.Context, run reconnectSession, dec
 // reconnectDelay returns the exponential backoff for the nth consecutive
 // failure: base 3s doubling each time, capped at 30s.
 func reconnectDelay(failureCount int) time.Duration {
-	shift := failureCount - 1
-	if shift > 4 {
-		shift = 4
-	}
-	delay := baseReconnectDelay << uint(shift)
-	if delay > maxReconnectDelay {
-		delay = maxReconnectDelay
-	}
-	return delay
+	shift := min(failureCount-1, 4)
+	return min(baseReconnectDelay<<uint(shift), maxReconnectDelay)
 }
 
 // gatewayRejectedError reports whether err is a terminal gateway rejection

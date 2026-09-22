@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,8 +25,7 @@ type HostConfig struct {
 	JWTToken string // JWT token (mutually exclusive with APIKey)
 	APIKey   string // API key (mutually exclusive with JWTToken)
 
-	// OnReady is called once the session is ready (ports start forwarding), with the list of hosted ports.
-	// It fires once per established connection or reconnect. May be nil.
+	// OnReady runs once the session is ready, with the hosted ports. May be nil.
 	OnReady func(ports []int)
 }
 
@@ -80,13 +79,21 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 	sniHost := cfg.TunnelID + "." + d.gatewayHost
 	wsURL := "wss://" + sniHost + "/" + cfg.TunnelID
 
+	params := sessionParams{
+		wsURL:        wsURL,
+		sniHost:      sniHost,
+		header:       header,
+		subprotocols: subprotocols,
+		tunnelID:     cfg.TunnelID,
+		ports:        cfg.Ports,
+	}
+
 	everConnected := false
 	return d.reconnectLoop(ctx, func() (bool, error) {
-		return d.runHostSession(ctx, wsURL, sniHost, header, subprotocols, cfg.TunnelID, cfg.Ports, cfg.OnReady)
+		return d.runHostSession(ctx, params, cfg.OnReady)
 	}, reconnectDecision{
-		// 网关明确拒绝（额度超限/隧道不存在）或首次连接前就报重复 host：直接终止，不重试。
-		// 注意：onConnected 在 shouldStop 之后才执行，因此此处的 everConnected 是上一次会话的值，
-		// 与原实现“先判断 duplicate、后更新 everConnected”的语义完全一致。
+		// Abort on gateway rejection (quota/tunnel) or a duplicate host before the first
+		// connection. onConnected runs after shouldStop, so everConnected is the prior value.
 		shouldStop: func(err error) bool {
 			if errors.Is(err, ErrDuplicateHost) && !everConnected {
 				d.logger.Debug("duplicate host, tunnel already has a listener", "tunnelID", cfg.TunnelID)
@@ -107,15 +114,56 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 	})
 }
 
-func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost string, header http.Header, subprotocols []string, tunnelID string, ports []int, onReady func([]int)) (connected bool, err error) {
-	netConn, err := d.dialWebSocket(ctx, wsURL, sniHost, header, subprotocols, 5)
+// hostSessionDiagnostics holds a host session's shutdown state: a one-shot
+// disconnect signal and the last close reason captured for logging.
+type hostSessionDiagnostics struct {
+	disconnected chan struct{}
+	closedMu     sync.Mutex
+	closedArgs   *ssh.SessionClosedEventArgs
+}
+
+func newHostSessionDiagnostics() *hostSessionDiagnostics {
+	return &hostSessionDiagnostics{disconnected: make(chan struct{}, 1)}
+}
+
+func (d *Devbridge) runHostSession(ctx context.Context, params sessionParams, onReady func([]int)) (connected bool, err error) {
+	outerSession, netConn, err := d.connectOuterSession(ctx, params)
 	if err != nil {
-		if errors.Is(err, ErrDuplicateHost) {
-			return false, fmt.Errorf("outer SSH connect failed: %w", err)
-		}
 		return false, err
 	}
 	defer func() { _ = netConn.Close() }()
+
+	d.logger.Debug("host: outer SSH session established", "tunnelID", params.tunnelID)
+
+	diag := newHostSessionDiagnostics()
+	d.installSessionCallbacks(outerSession, params.tunnelID, diag)
+
+	pn := newPortNotifier()
+	go d.startHostAcceptLoop(ctx, outerSession, params.ports, pn)
+
+	if len(params.ports) == 0 {
+		if err := d.waitForGatewayPorts(ctx, outerSession, params.tunnelID, pn, diag); err != nil {
+			return true, err
+		}
+	}
+
+	printPorts := params.ports
+	if len(params.ports) == 0 {
+		printPorts = pn.ports
+	}
+	d.reportReady(params.tunnelID, printPorts, onReady)
+
+	return d.waitSessionEnd(ctx, outerSession, params.tunnelID, diag)
+}
+
+func (d *Devbridge) connectOuterSession(ctx context.Context, params sessionParams) (*ssh.ClientSession, net.Conn, error) {
+	netConn, err := d.dialWebSocket(ctx, params.wsURL, params.sniHost, params.header, params.subprotocols, 5)
+	if err != nil {
+		if errors.Is(err, ErrDuplicateHost) {
+			return nil, nil, fmt.Errorf("outer SSH connect failed: %w", err)
+		}
+		return nil, nil, err
+	}
 
 	outerConfig := ssh.NewNoSecurityConfig()
 	outerConfig.KeepAliveIntervalSeconds = 10
@@ -125,31 +173,23 @@ func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost st
 	outerSession.Trace = sshTraceFunc(d.logger)
 
 	if err := outerSession.Connect(ctx, netConn); err != nil {
-		err = parseSSHCloseError(err)
 		_ = netConn.Close()
-		return false, fmt.Errorf("outer SSH connect failed: %w", err)
+		return nil, nil, fmt.Errorf("outer SSH connect failed: %w", parseSSHCloseError(err))
 	}
-	d.logger.Debug("host: outer SSH session established", "tunnelID", tunnelID)
-	connected = true
+	return outerSession, netConn, nil
+}
 
-	disconnected := make(chan struct{}, 1)
+func (d *Devbridge) installSessionCallbacks(outerSession *ssh.ClientSession, tunnelID string, diag *hostSessionDiagnostics) {
 	outerSession.OnDisconnected = func() {
 		select {
-		case disconnected <- struct{}{}:
+		case diag.disconnected <- struct{}{}:
 		default:
 		}
 	}
-
-	// 诊断：捕获底层会话关闭原因，区分"网关主动掐断"（DisconnectByApplication）
-	// 与"网络断开/keepalive 超时"（DisconnectConnectionLost）。
-	var (
-		closedArgsMu sync.Mutex
-		closedArgs   *ssh.SessionClosedEventArgs
-	)
 	outerSession.OnClosed = func(args *ssh.SessionClosedEventArgs) {
-		closedArgsMu.Lock()
-		closedArgs = args
-		closedArgsMu.Unlock()
+		diag.closedMu.Lock()
+		diag.closedArgs = args
+		diag.closedMu.Unlock()
 		d.logger.Debug("host: session closed (diagnostic)",
 			"tunnelID", tunnelID,
 			"reason", args.Reason,
@@ -162,34 +202,28 @@ func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost st
 			_ = outerSession.Close()
 		}
 	}
+}
 
-	pn := newPortNotifier()
-
-	go d.startHostAcceptLoop(ctx, outerSession, tunnelID, ports, pn)
-
-	if len(ports) == 0 {
-		select {
-		case <-pn.ready:
-		case <-time.After(5 * time.Second):
-			d.logger.Warn("timeout waiting for port notification from gateway")
-		case <-disconnected:
-			d.logDiagnosticClose(tunnelID, &closedArgsMu, &closedArgs)
-			return true, fmt.Errorf("disconnected")
-		case <-outerSession.Session.Done():
-			d.logDiagnosticClose(tunnelID, &closedArgsMu, &closedArgs)
-			return true, fmt.Errorf("session closed")
-		}
+func (d *Devbridge) waitForGatewayPorts(ctx context.Context, outerSession *ssh.ClientSession, tunnelID string, pn *portNotifier, diag *hostSessionDiagnostics) error {
+	select {
+	case <-pn.ready:
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(5 * time.Second):
+		d.logger.Warn("timeout waiting for port notification from gateway")
+	case <-diag.disconnected:
+		d.logDiagnosticClose(tunnelID, diag)
+		return fmt.Errorf("disconnected")
+	case <-outerSession.Session.Done():
+		d.logDiagnosticClose(tunnelID, diag)
+		return fmt.Errorf("session closed")
 	}
+	return nil
+}
 
-	printPorts := ports
-	if len(ports) == 0 {
-		printPorts = pn.ports
-	}
-
-	// Filter out the "all ports" sentinel value: it only matters for visitor URL access,
-	// and host does not need to start a local port forward for -1.
-	realPorts := filterForwardPorts(printPorts)
-	if len(realPorts) == 0 && len(printPorts) > 0 {
+func (d *Devbridge) reportReady(tunnelID string, ports []int, onReady func([]int)) {
+	realPorts := filterForwardPorts(ports)
+	if len(realPorts) == 0 && len(ports) > 0 {
 		d.statusln("All ports mode: this tunnel accepts any port via URL")
 		d.statusf("Access your service at: https://%s-<port>.%s\n", tunnelID, d.gatewayHost)
 	}
@@ -201,18 +235,19 @@ func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost st
 	}
 	d.statusln("Ready to accept connections")
 	d.statusln("Auto reconnect: enabled")
-
 	if onReady != nil {
 		onReady(realPorts)
 	}
+}
 
+func (d *Devbridge) waitSessionEnd(ctx context.Context, outerSession *ssh.ClientSession, tunnelID string, diag *hostSessionDiagnostics) (bool, error) {
 	for {
 		select {
-		case <-disconnected:
-			d.logDiagnosticClose(tunnelID, &closedArgsMu, &closedArgs)
+		case <-diag.disconnected:
+			d.logDiagnosticClose(tunnelID, diag)
 			return true, fmt.Errorf("disconnected")
 		case <-outerSession.Session.Done():
-			d.logDiagnosticClose(tunnelID, &closedArgsMu, &closedArgs)
+			d.logDiagnosticClose(tunnelID, diag)
 			return true, fmt.Errorf("session closed")
 		case <-ctx.Done():
 			return true, nil
@@ -220,12 +255,11 @@ func (d *Devbridge) runHostSession(ctx context.Context, wsURL string, sniHost st
 	}
 }
 
-// logDiagnosticClose 打印 host 连接丢失时的底层关闭原因（诊断用）。
-// reason=DisconnectByApplication 说明对端(网关)主动关；DisconnectConnectionLost 说明网络层断开。
-func (d *Devbridge) logDiagnosticClose(tunnelID string, mu *sync.Mutex, args **ssh.SessionClosedEventArgs) {
-	mu.Lock()
-	a := *args
-	mu.Unlock()
+// logDiagnosticClose logs why the host connection was lost (diagnostic only).
+func (d *Devbridge) logDiagnosticClose(tunnelID string, diag *hostSessionDiagnostics) {
+	diag.closedMu.Lock()
+	a := diag.closedArgs
+	diag.closedMu.Unlock()
 	if a == nil {
 		d.logger.Debug("host connection lost (no close event captured)", "tunnelID", tunnelID)
 		return
@@ -247,7 +281,7 @@ func newPortNotifier() *portNotifier {
 	return &portNotifier{ready: make(chan struct{})}
 }
 
-func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.ClientSession, tunnelID string, ports []int, pn *portNotifier) {
+func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.ClientSession, ports []int, pn *portNotifier) {
 	for {
 		channel, err := outerSession.AcceptChannel(ctx)
 		if err != nil {
@@ -257,9 +291,8 @@ func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.C
 		switch channel.ChannelType {
 		case relayChannelType:
 			if !pn.received.Load() {
-				// 第一个 relay channel 按协议是网关的端口通知（RelayRequest）。
-				// 但以防协议演进，用内容校验而非位置约定：解析出 RelayRequest 才当通知消费，
-				// 否则视为转发请求走正常转发，避免"无条件吞掉第一个非通知 channel"。
+				// Treat the first relay channel as the gateway's port notification only when it
+				// parses as a RelayRequest; otherwise forward it as normal data.
 				notifPorts, isNotif := readPortNotification(channel)
 				if isNotif {
 					if len(ports) == 0 {
@@ -275,7 +308,7 @@ func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.C
 			if len(effectivePorts) == 0 {
 				effectivePorts = pn.ports
 			}
-			go d.handleRelayChannel(ctx, channel, tunnelID, effectivePorts)
+			go d.handleRelayChannel(ctx, channel, effectivePorts)
 		default:
 			d.logger.Debug("host: draining non-relay channel",
 				"channelType", channel.ChannelType, "channelID", channel.ChannelID)
@@ -283,10 +316,8 @@ func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.C
 	}
 }
 
-// readPortNotification reads one relay channel and reports whether it is the gateway's
-// port notification (RelayRequest). It returns false when the payload is not a valid
-// RelayRequest message, so the caller must treat the channel as a data-forwarding
-// channel instead of consuming/discarding it.
+// readPortNotification reports whether a relay channel is the gateway's port
+// notification; callers forward the channel as data when it returns false.
 func readPortNotification(channel *ssh.Channel) ([]int, bool) {
 	stream := ssh.NewStream(channel)
 	buf := make([]byte, 4096)
@@ -297,9 +328,8 @@ func readPortNotification(channel *ssh.Channel) ([]int, bool) {
 	return parsePortNotification(buf[:n])
 }
 
-// parsePortNotification parses a gateway port-notification payload.
-// A valid notification is a RelayRequest message (@type="RelayRequest"); anything
-// else (garbage, empty, or a different message type) is not a port notification.
+// parsePortNotification returns the ports of a RelayRequest payload, or false when
+// the payload is not a valid port notification.
 func parsePortNotification(data []byte) ([]int, bool) {
 	var msg relayPortMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
@@ -315,7 +345,7 @@ func parsePortNotification(data []byte) ([]int, bool) {
 	return ports, true
 }
 
-func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel, tunnelID string, ports []int) {
+func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel, ports []int) {
 	innerConfig := ssh.NewNoSecurityConfig()
 	tcp.AddPortForwardingService(innerConfig)
 	innerSession := ssh.NewServerSession(innerConfig)
