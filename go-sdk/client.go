@@ -15,7 +15,7 @@ import (
 	"os"
 	"regexp"
 
-	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/httpclient"
+	"github.com/17673651504/devspace-devbridge/go-sdk/internal/httpclient"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 
 // DefaultClusterID is the cluster used when creating new tunnels.
 // It is a var (not const) so builds can override it via ldflags
-// (-X github.com/huaweicloud/devspace-devbridge/go-sdk.DefaultClusterID=...).
+// (-X github.com/17673651504/devspace-devbridge/go-sdk.DefaultClusterID=...).
 var DefaultClusterID = "devbridge-s2"
 
 var (
