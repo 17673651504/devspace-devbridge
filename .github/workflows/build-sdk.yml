@@ -5,7 +5,9 @@
 #   - The module github.com/17673651504/devspace-devbridge/go-sdk lives in
 #     ./go-sdk, so release tags MUST be `go-sdk/vX.Y.Z` (Go module proxy rule
 #     for subdirectory modules). The proxy indexes the tag on push; no extra
-#     object is required for `go get` to work.
+#     object is required for `go get` to work. Manual version input may omit
+#     the v (0.2.3-alpha); the workflow normalizes it to v0.2.3-alpha so the
+#     tag still satisfies the module proxy rule.
 #   - Version is strict SemVer: v0.2.0, v0.2.0-rc.1, v0.2.0-beta.1, ...
 #     Invalid versions are rejected BEFORE anything is published, because tags
 #     are immutable and the module proxy caches a bad tag forever.
@@ -60,7 +62,11 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号 vX.Y.Z 或 go-sdk/vX.Y.Z（支持 v0.2.0-rc.1 等预发布；会创建相同版本号的 GitHub Release；留空则只跑 CI 不发布）'
+        description: '版本号 0.2.3 / 0.2.3-alpha（v 和 go-sdk/ 前缀可选，自动补全；留空则只跑 CI 不发布）'
+        required: false
+        default: ''
+      gitcode_token:
+        description: 'GitCode 令牌（留空则用仓库 secret，都没有则跳过 GitCode 上传）'
         required: false
         default: ''
 
@@ -155,12 +161,17 @@ jobs:
           else
             RAW_VERSION="${GITHUB_REF_NAME}"
           fi
-          # 统一去前缀：go-sdk/v0.2.1 -> v0.2.1（兼容手抖输入的 sdk/v0.2.1）
+          # 统一去前缀：go-sdk/v0.2.1 / sdk/v0.2.1 -> v0.2.1
           NORMALIZED="$(printf '%s' "$RAW_VERSION" | sed -E 's#^(go-sdk|sdk)/##')"
-          # 严格 SemVer：vX.Y.Z / vX.Y.Z-rc.1 / vX.Y.Z+build。拒绝 v0.2、0.2.0、release 等非法值
-          if ! printf '%s' "$NORMALIZED" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
-            echo "❌ 非法版本号: '$NORMALIZED'（必须是 SemVer，例如 v0.2.0 或 go-sdk/v0.2.0-rc.1）"
+          # 宽松 SemVer 输入：v 前缀可选，支持 0.2.3 / 0.2.3-alpha / 0.2.3-release / v0.2.0-rc.1 +build
+          if ! printf '%s' "$NORMALIZED" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "❌ 非法版本号: '$NORMALIZED'（必须是 SemVer，例如 0.2.3、0.2.3-alpha 或 go-sdk/v0.2.0-rc.1）"
             exit 1
+          fi
+          # Go 模块 tag 强制要求 v 前缀（go-sdk/vX.Y.Z），缺了就补：
+          # 输入 0.2.3-alpha -> 规范化 v0.2.3-alpha，release tag = go-sdk/v0.2.3-alpha
+          if ! printf '%s' "$NORMALIZED" | grep -q '^v'; then
+            NORMALIZED="v${NORMALIZED}"
           fi
           # 供发布步骤使用；prev_release_tag 用于限制 changelog 范围（无则留空）
           PREV="$(git tag --list 'go-sdk/v*' --sort=-v:refname | sed -n 2p)"
@@ -279,7 +290,9 @@ jobs:
       group: sdk-release-${{ needs.package.outputs.version }}
       cancel-in-progress: false
     env:
-      GITCODE_TOKEN: ${{ secrets.GITCODE_TOKEN }}
+      # 手动触发时可用输入框直接填令牌（和 CLI 一致）；tag 触发或未填时退回 secret。
+      # NOTE: 输入框令牌对仓库有读权限的人可见，正式使用请优先配置 secret GITCODE_TOKEN。
+      GITCODE_TOKEN: ${{ inputs.gitcode_token || secrets.GITCODE_TOKEN }}
       GITCODE_SDK_OWNER: ${{ vars.GITCODE_SDK_OWNER }}
       GITCODE_SDK_REPO: ${{ vars.GITCODE_SDK_REPO }}
     steps:
