@@ -12,12 +12,15 @@
 #   - Quality gates (build job) must pass before publish:
 #     gofmt, go mod tidy, go build, go vet, go test -race, govulncheck.
 #   - GitHub Release is a convenience archive (source tar.gz + checksums) with
-#     auto-generated changelog from conventional commits. It is ALWAYS marked
-#     prerelease AND --latest=false so it never steals this repo's
-#     `releases/latest` from the CLI (README / install.sh / updater.go all use
-#     releases/latest/download/). On GitCode the upload passes --no-latest, so
-#     the rolling `latest` Release (maintained by the shared upload script for
-#     the CLI on CloudDeveloperDepartment/devbrige) is left untouched.
+#     auto-generated changelog from conventional commits. Stable versions
+#     (v0.2.3) are published as NORMAL releases, so they show in the Releases
+#     main list; pre-release versions (-alpha/-beta/-rc.N) keep the prerelease
+#     flag per SemVer convention. EVERY SDK release passes --latest=false, so
+#     it never steals this repo's `releases/latest` from the CLI
+#     (README / install.sh / updater.go all use releases/latest/download/).
+#     On GitCode the upload passes --no-latest, so the rolling `latest` Release
+#     (maintained by the shared upload script for the CLI on
+#     CloudDeveloperDepartment/devbrige) is left untouched.
 #   - After publish, the verify job proves the module resolves from the tag
 #     (GOPROXY=direct go list -m), only when run in the canonical repo
 #     (huaweicloud/devspace-devbridge) that matches the module path.
@@ -197,7 +200,7 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------
-  # Publish: GitHub Release（prerelease + 自动 changelog + 源码包/checksums）。
+  # Publish: GitHub Release（稳定版正常展示 + --latest=false + 自动 changelog）。
   # ---------------------------------------------------------------------------
   publish-github:
     runs-on: ubuntu-latest
@@ -239,11 +242,20 @@ jobs:
           else
             GEN_NOTES="--generate-notes"
           fi
+          # 语义化发布：
+          #   - 稳定版 (v0.2.3)        → 普通 release，出现在 Releases 主列表 ✓
+          #   - 预发布版 (v0.2.3-alpha) → 按 SemVer 惯例标 prerelease（折叠展示）
+          # 两者都加 --latest=false：显式不抢 CLI 的 releases/latest。
+          if printf '%s' "$VERSION" | grep -q -- '-'; then
+            PRERELEASE_FLAG="--prerelease"
+          else
+            PRERELEASE_FLAG=""
+          fi
           gh release create "${TAG}" \
             ${TARGET:+--target "${TARGET}"} \
             --title "devbridge-go-sdk ${VERSION}" \
             ${GEN_NOTES} \
-            --prerelease \
+            ${PRERELEASE_FLAG} \
             --latest=false \
             "dist/devbridge-go-sdk-${VERSION}.tar.gz" \
             "dist/checksums.txt"
