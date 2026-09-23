@@ -8,6 +8,9 @@
 #   3. Upload every file in the given directory as an asset to that Release
 #   4. Sync the rolling "latest" Release (holds only the install scripts) for
 #      one-click installs via /releases/download/latest/
+#      Pass --no-latest to SKIP maintaining the rolling "latest" Release
+#      (used by the SDK publish: SDK releases share the repo but must not
+#      touch the CLI's latest install scripts).
 #
 # Usage:
 #   ./scripts/upload-gitcode-release.sh \
@@ -71,6 +74,7 @@ Options:
   -d, --dir DIR           artifact directory; all files under it are uploaded (required)
   -n, --name NAME         Release name (defaults to version)
   -b, --body BODY         Release description (defaults to empty)
+      --no-latest         do NOT sync the rolling "latest" Release (default: sync it)
   -h, --help              show help
 EOF
   exit 0
@@ -88,6 +92,7 @@ while [[ $# -gt 0 ]]; do
     -d|--dir)     DIR="$2"; shift 2 ;;
     -n|--name)    RELEASE_NAME="$2"; shift 2 ;;
     -b|--body)    RELEASE_BODY="$2"; shift 2 ;;
+    --no-latest)  NO_LATEST=1 ;;
     -h|--help)    usage ;;
     *)            log_error "unknown option: $1" ;;
   esac
@@ -378,7 +383,10 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Sync the rolling "latest" Release (only the install scripts)
 # ---------------------------------------------------------------------------
-log_info "===== 4/4 syncing the rolling latest Release ====="
+if [[ -n "${NO_LATEST:-}" ]]; then
+  log_info "===== 4/4 skipping the rolling latest Release (--no-latest) ====="
+else
+  log_info "===== 4/4 syncing the rolling latest Release ====="
 
 # The "latest" Release only holds install.sh and install.ps1; the scripts already
 # have the real version and download URL baked in, so users can one-click install
@@ -419,6 +427,8 @@ if [[ "$LATEST_FAILED" -gt 0 ]]; then
   log_warn "${LATEST_FAILED} files of the latest Release failed to upload"
 fi
 
+fi
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
@@ -430,7 +440,9 @@ log_info ""
 log_info "Version Release:"
 log_info "  ${GITCODE_BASE}/${OWNER}/${REPO}/releases/${VERSION}"
 log_info "  curl -fsSL ${GITCODE_BASE}/${OWNER}/${REPO}/releases/download/${VERSION}/install.sh | bash"
-log_info ""
-log_info "Latest (rolling latest):"
-log_info "  ${GITCODE_BASE}/${OWNER}/${REPO}/releases/${LATEST_TAG}"
-log_info "  curl -fsSL ${GITCODE_BASE}/${OWNER}/${REPO}/releases/download/${LATEST_TAG}/install.sh | bash"
+if [[ -z "${NO_LATEST:-}" ]]; then
+  log_info ""
+  log_info "Latest (rolling latest):"
+  log_info "  ${GITCODE_BASE}/${OWNER}/${REPO}/releases/${LATEST_TAG}"
+  log_info "  curl -fsSL ${GITCODE_BASE}/${OWNER}/${REPO}/releases/download/${LATEST_TAG}/install.sh | bash"
+fi
