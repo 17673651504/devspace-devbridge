@@ -119,7 +119,13 @@ jobs:
 
       - name: Vulnerability scan (govulncheck)
         working-directory: go-sdk
-        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        env:
+          # 用当前稳定版工具链(go1.26.8)扫描，标准库漏洞检查才是有效的：
+          # go1.22 早已 EOL，旧补丁上的 stdlib 漏洞永远不会被修复，扫必挂。
+          # SDK 自身的 go 1.22.0 最低版本声明不变，不影响下游使用者。
+          GOTOOLCHAIN: go1.26.8
+        # 固定 v1.1.4：与 go 1.22 兼容；@latest(v1.8+) 要求 go >= 1.26 会直接失败。
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
 
   # ---------------------------------------------------------------------------
   # Package: 解析并校验版本号，打包源码（tar.gz + checksums）。
