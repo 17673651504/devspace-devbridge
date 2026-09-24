@@ -304,6 +304,73 @@ upload_asset() {
   return 1
 }
 
+
+# ---------------------------------------------------------------------------
+# attach_cli_install_scripts - ensure a Release carries the CLI install.sh /
+# install.ps1 even when the built package has none (SDK releases).
+#
+# Why: GitCode resolves `releases/download/latest/<file>` to the NEWEST-created
+# Release (NOT the Release tagged "latest"). If the newest Release has no
+# install scripts, the one-click install URL 404s. So whenever a non-CLI
+# Release (SDK etc.) is published, attach the CLI installer fetched from the
+# newest existing Release that already carries it (i.e. the latest CLI Release).
+# ---------------------------------------------------------------------------
+attach_cli_install_scripts() {
+  local tag="$1"
+  local list newest_with_scripts tmp
+  list=$(curl -s --connect-timeout 30 --max-time 60 \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "$(api_url "/releases?per_page=20")") || true
+
+  newest_with_scripts=$(echo "$list" | jq -r --arg t "$tag" '
+    [ .[] | select(.tag_name != $t)
+            | select([.assets[]? | select(.name == "install.sh" and .type == "attach")] | length > 0) ]
+    | sort_by(.created_at)
+    | .[-1].tag_name // empty' 2>/dev/null || true)
+
+  if [[ -z "$newest_with_scripts" ]]; then
+    log_warn "  no other Release carries install.sh; skipping CLI installer attach"
+    return 0
+  fi
+
+  log_info "  attaching CLI install scripts from Release '${newest_with_scripts}'"
+
+  # remove any previous install scripts already attached to this Release
+  local ids aid
+  mapfile -t ids < <(curl -s --connect-timeout 30 --max-time 60 \
+    -H "Authorization: Bearer ${TOKEN}" \
+    "$(api_url "/releases/tags/${tag}")" | jq -r '.assets[]? | select(.type == "attach" and (.name == "install.sh" or .name == "install.ps1")) | .id // empty')
+  for aid in "${ids[@]}"; do
+    curl -s --connect-timeout 30 --max-time 60 -o /dev/null \
+      -X DELETE \
+      -H "Authorization: Bearer ${TOKEN}" \
+      "$(api_url "/releases/${tag}/attach_files/${aid}")"
+  done
+
+  tmp=$(mktemp -d)
+  local filename dl
+  for filename in install.sh install.ps1; do
+    dl=$(echo "$list" | jq -r --arg t "$newest_with_scripts" --arg n "$filename" '
+      .[] | select(.tag_name == $t) | .assets[] | select(.name == $n and .type == "attach") | .browser_download_url' | head -1)
+    if [[ -z "$dl" ]]; then
+      log_warn "  ${filename} not found on ${newest_with_scripts}, skipping"
+      continue
+    fi
+    if curl -fsSL --connect-timeout 30 --max-time 120 -o "${tmp}/${filename}" "$dl"; then
+      if upload_asset "$tag" "${tmp}/${filename}"; then
+        log_info "  attached ${filename} (from ${newest_with_scripts})"
+      else
+        rm -rf "$tmp"
+        log_error "  failed to upload ${filename} into Release ${tag}"
+      fi
+    else
+      rm -rf "$tmp"
+      log_error "  failed to download ${filename} from ${dl}"
+    fi
+  done
+  rm -rf "$tmp"
+}
+
 # ===========================================================================
 # Main
 # ===========================================================================
@@ -378,6 +445,16 @@ log_info "version Release upload done: ${SUCCESS}/${#FILES[@]} succeeded, ${FAIL
 
 if [[ "$FAILED" -gt 0 ]]; then
   log_error "${FAILED} files failed to upload"
+fi
+
+# ---------------------------------------------------------------------------
+# 3.5 If this package has no install scripts (SDK releases), attach the latest
+#     CLI installer so GitCode's newest-Release-based download/latest keeps
+#     working regardless of which Release happens to be the newest.
+# ---------------------------------------------------------------------------
+if [[ ! -f "${DIR}/install.sh" && ! -f "${DIR}/install.ps1" ]]; then
+  log_info "===== 3.5 package has no install scripts; attaching latest CLI installer ====="
+  attach_cli_install_scripts "$RELEASE_TAG"
 fi
 
 # ---------------------------------------------------------------------------
