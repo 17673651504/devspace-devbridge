@@ -284,6 +284,7 @@ jobs:
   # Mirror: GitCode 源码镜像（保持该仓库原有约定，消费 package 产物）。
   # ---------------------------------------------------------------------------
   publish-gitcode:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     needs: package
     concurrency:
@@ -315,7 +316,7 @@ jobs:
             --no-latest \
             -t "$GITCODE_TOKEN" \
             -o "${GITCODE_SDK_OWNER:-CloudDeveloperDepartment}" \
-            -r "${GITCODE_SDK_REPO:-devbridge-go-sdk}" \
+            -r "${GITCODE_SDK_REPO:-devbrige}" \
             -v "${{ needs.package.outputs.version }}" \
             -d ./dist \
             -n "devbridge-go-sdk ${{ needs.package.outputs.version }}" \
