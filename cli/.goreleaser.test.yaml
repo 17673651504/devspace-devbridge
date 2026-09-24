@@ -26,7 +26,7 @@ before:
   hooks:
     - go test ./...
     # Bake install scripts: inject version + GitHub Release URL
-    - ./scripts/bake-install.sh {{ .Version }} "https://github.com/huaweicloud/devspace-devbridge/releases/download/{{ .Version }}"
+    - ./scripts/bake-install.sh {{ .Version }} "https://github.com/17673651504/devspace-devbridge/releases/download/{{ .Version }}"
 
 builds:
   - id: devbridge
@@ -69,7 +69,7 @@ changelog:
 
 release:
   github:
-    owner: huaweicloud
+    owner: 17673651504
     name: devspace-devbridge
   # Baked install scripts as extra release assets
   extra_files:

@@ -15,7 +15,7 @@
 #
 # Example:
 #   ./scripts/bake-install.sh 1.0.0-release \
-#     "https://github.com/huaweicloud/devspace-devbridge/releases/download/1.0.0-release" \
+#     "https://github.com/17673651504/devspace-devbridge/releases/download/1.0.0-release" \
 #     "https://tools-artifact.developer.huaweicloud.com/sharedata/devbridge"
 #
 # Output:

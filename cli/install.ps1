@@ -103,7 +103,7 @@ Options:
 
 Examples:
     # GitHub one-click:
-    irm https://github.com/huaweicloud/devspace-devbridge/releases/latest/download/install.ps1 | iex
+    irm https://github.com/17673651504/devspace-devbridge/releases/latest/download/install.ps1 | iex
     # GitCode one-click:
     irm https://gitcode.com/CloudDeveloperDepartment/devbrige/releases/download/latest/install.ps1 | iex
     # OBS/CDN one-click:

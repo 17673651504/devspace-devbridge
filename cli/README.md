@@ -35,10 +35,10 @@
 
 ```bash
 # 从 GitHub Release 安装最新版本
-curl -fsSL https://github.com/huaweicloud/devspace-devbridge/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/17673651504/devspace-devbridge/releases/latest/download/install.sh | bash
 
 # 从 GitHub Release 安装指定版本
-curl -fsSL https://github.com/huaweicloud/devspace-devbridge/releases/download/v1.0.0/install.sh | bash
+curl -fsSL https://github.com/17673651504/devspace-devbridge/releases/download/v1.0.0/install.sh | bash
 
 # 从 GitCode Release 安装最新版本
 curl -fsSL https://gitcode.com/CloudDeveloperDepartment/devbrige/releases/download/latest/install.sh | bash
@@ -54,10 +54,10 @@ curl -fsSL https://tools-artifact.developer.huaweicloud.com/sharedata/devbridge/
 
 ```powershell
 # 从 GitHub Release 安装最新版本
-irm https://github.com/huaweicloud/devspace-devbridge/releases/latest/download/install.ps1 | iex
+irm https://github.com/17673651504/devspace-devbridge/releases/latest/download/install.ps1 | iex
 
 # 从 GitHub Release 安装指定版本
-irm https://github.com/huaweicloud/devspace-devbridge/releases/download/v1.0.0/install.ps1 | iex
+irm https://github.com/17673651504/devspace-devbridge/releases/download/v1.0.0/install.ps1 | iex
 
 # 从 GitCode Release 安装最新版本
 irm https://gitcode.com/CloudDeveloperDepartment/devbrige/releases/download/latest/install.ps1 | iex

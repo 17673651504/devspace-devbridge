@@ -132,7 +132,7 @@ Options:
 
 Examples:
     # GitHub one-click:
-    curl -fsSL https://github.com/huaweicloud/devspace-devbridge/releases/latest/download/install.sh | bash
+    curl -fsSL https://github.com/17673651504/devspace-devbridge/releases/latest/download/install.sh | bash
     # GitCode one-click:
     curl -fsSL https://gitcode.com/CloudDeveloperDepartment/devbrige/releases/download/latest/install.sh | bash
     # OBS one-click:

