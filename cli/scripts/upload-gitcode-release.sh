@@ -92,7 +92,7 @@ while [[ $# -gt 0 ]]; do
     -d|--dir)     DIR="$2"; shift 2 ;;
     -n|--name)    RELEASE_NAME="$2"; shift 2 ;;
     -b|--body)    RELEASE_BODY="$2"; shift 2 ;;
-    --no-latest)  NO_LATEST=1 ;;
+    --no-latest)  NO_LATEST=1; shift ;;
     -h|--help)    usage ;;
     *)            log_error "unknown option: $1" ;;
   esac
