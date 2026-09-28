@@ -94,7 +94,7 @@ func (d *Devbridge) runConnectSession(ctx context.Context, params sessionParams,
 	}
 
 	config := ssh.NewNoSecurityConfig()
-	config.KeepAliveIntervalSeconds = 10
+	config.KeepAliveIntervalSeconds = keepAliveIntervalSeconds
 	tcp.AddPortForwardingService(config)
 
 	session := ssh.NewClientSession(config)

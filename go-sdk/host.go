@@ -18,6 +18,15 @@ import (
 	"github.com/microsoft/dev-tunnels-ssh/src/go/tcp"
 )
 
+// Session tuning constants shared by Host and Connect sessions. Kept as
+// package-level constants so Host and Connect cannot drift apart.
+const (
+	keepAliveIntervalSeconds = 10              // SSH keepalive interval (seconds)
+	keyRotationThreshold     = 0               // disable key rotation (host key is process-wide)
+	keepAliveFailThreshold   = 5               // consecutive keepalive failures before forcing reconnect
+	gatewayPortTimeout       = 5 * time.Second // wait for the gateway port notification
+)
+
 // HostConfig is the configuration for hosting a tunnel.
 type HostConfig struct {
 	TunnelID string // tunnel ID
@@ -166,8 +175,8 @@ func (d *Devbridge) connectOuterSession(ctx context.Context, params sessionParam
 	}
 
 	outerConfig := ssh.NewNoSecurityConfig()
-	outerConfig.KeepAliveIntervalSeconds = 10
-	outerConfig.KeyRotationThreshold = 0
+	outerConfig.KeepAliveIntervalSeconds = keepAliveIntervalSeconds
+	outerConfig.KeyRotationThreshold = keyRotationThreshold
 	tcp.AddPortForwardingService(outerConfig)
 	outerSession := ssh.NewClientSession(outerConfig)
 	outerSession.Trace = sshTraceFunc(d.logger)
@@ -197,8 +206,8 @@ func (d *Devbridge) installSessionCallbacks(outerSession *ssh.ClientSession, tun
 			"err", args.Err)
 	}
 	outerSession.OnKeepAliveFailed = func(count int) {
-		if count >= 5 {
-			d.logger.Error("keepalive failed 5 times, forcing reconnect", "tunnelID", tunnelID)
+		if count >= keepAliveFailThreshold {
+			d.logger.Error(fmt.Sprintf("keepalive failed %d times, forcing reconnect", keepAliveFailThreshold), "tunnelID", tunnelID)
 			_ = outerSession.Close()
 		}
 	}
@@ -209,7 +218,7 @@ func (d *Devbridge) waitForGatewayPorts(ctx context.Context, outerSession *ssh.C
 	case <-pn.ready:
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-time.After(5 * time.Second):
+	case <-time.After(gatewayPortTimeout):
 		d.logger.Warn("timeout waiting for port notification from gateway")
 	case <-diag.disconnected:
 		d.logDiagnosticClose(tunnelID, diag)
