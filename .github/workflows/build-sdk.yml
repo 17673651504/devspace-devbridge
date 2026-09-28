@@ -1,25 +1,24 @@
 # =============================================================================
 # Build and release the DevBridge Go SDK.
 #
-# Release is a git tag (e.g. go-sdk/v0.1.0); the Go module proxy indexes it
-# automatically. This workflow:
-#   - verifies the SDK builds, vets, and tests cleanly;
-#   - on a manual dispatch with a version, creates the tag on GitHub;
-#   - mirrors the tag to the GitCode mirror repo devbrige.
+# The SDK lives in ./go-sdk, so release tags MUST be go-sdk/vX.Y.Z (Go module
+# proxy rule for subdirectory modules). On tag push the proxy indexes the
+# version automatically; this workflow adds a source archive release on top:
+#   - verifies the SDK builds cleanly (quality gates);
+#   - publishes a GitHub Release (source tar.gz + checksums.txt) with
+#     --latest=false, so it never steals releases/latest from the CLI;
+#   - mirrors the archive to the GitCode repo devbrige with --no-latest, so the
+#     CLI's rolling latest Release is left untouched.
 #
 # Triggers:
 #   pull_request          PR touching go-sdk/**
 #   push (branches)       develop/master changes under go-sdk/**
-#   push (tags go-sdk/v*) SDK release tag (build + mirror to GitCode)
-#   workflow_dispatch     manual (optional: create tag + mirror to GitCode)
+#   push (tags go-sdk/v*) release tag -> CI + publish
+#   workflow_dispatch     manual (input.version) -> CI + publish
 #
 # Notes:
-#   - The SDK lives in a subdirectory; release tags must use the go-sdk/ prefix.
 #   - Tags are immutable once pushed (the module proxy caches them forever).
-#   - Requires the repo's Actions "Workflow permissions" to allow read/write
-#     (needed for the GITHUB_TOKEN tag push).
-#   - GitCode token comes from inputs.gitcode_token (manual) or
-#     secrets.GITCODE_TOKEN; skipped when neither is set.
+#   - Re-running a dispatch with an already-released version fails (422).
 # =============================================================================
 name: Build SDK
 
@@ -39,25 +38,27 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: '版本号（如 go-sdk/v0.1.0，留空则仅构建）'
+        description: '版本号（0.2.3 / 0.2.3-alpha，v 或 go-sdk/ 前缀可选；留空只跑 CI 不发布）'
         required: false
         default: ''
       gitcode_token:
-        description: 'GitCode 令牌（留空则跳过 GitCode tag 同步）'
+        description: 'GitCode 令牌（留空则用仓库 secret，都没有则跳过 GitCode 上传）'
         required: false
         default: ''
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # CI quality gates; publishing is gated on these passing.
+  # ---------------------------------------------------------------------------
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # Use the Go version declared in go.mod.
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
@@ -76,12 +77,69 @@ jobs:
         working-directory: go-sdk
         run: go test ./...
 
-  # Create the release tag on GitHub (manual dispatch only) and mirror it to
-  # GitCode. On a tag push the tag already exists, so only the mirror step runs.
-  release:
+  # ---------------------------------------------------------------------------
+  # Package: resolve/validate the version and package the source archive.
+  # ---------------------------------------------------------------------------
+  package:
     runs-on: ubuntu-latest
     needs: build
     if: startsWith(github.ref, 'refs/tags/go-sdk/') || (github.event_name == 'workflow_dispatch' && inputs.version != '')
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and validate version
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            RAW_VERSION="${{ inputs.version }}"
+          else
+            RAW_VERSION="${GITHUB_REF_NAME}"
+          fi
+          # Strip any go-sdk/ or sdk/ prefix: go-sdk/v0.2.1 -> v0.2.1
+          NORMALIZED="$(printf '%s' "$RAW_VERSION" | sed -E 's#^(go-sdk|sdk)/##')"
+          # Loose SemVer input: optional v, support 0.2.3 / 0.2.3-alpha / v0.2.0-rc.1
+          if ! printf '%s' "$NORMALIZED" | grep -Eq '^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'; then
+            echo "::error::invalid version '$NORMALIZED' (must be SemVer, e.g. 0.2.3 / 0.2.3-alpha / v0.2.0-rc.1)"
+            exit 1
+          fi
+          # Go module tags require the v prefix (go-sdk/vX.Y.Z).
+          if ! printf '%s' "$NORMALIZED" | grep -q '^v'; then
+            NORMALIZED="v${NORMALIZED}"
+          fi
+          echo "version=${NORMALIZED}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=go-sdk/${NORMALIZED}" >> "$GITHUB_OUTPUT"
+          echo "  version: ${NORMALIZED}"
+          echo "  release tag: go-sdk/${NORMALIZED}"
+
+      - name: Package SDK source
+        run: |
+          mkdir -p dist
+          git archive --format=tar.gz \
+            --prefix="devbridge-go-sdk-${{ steps.resolve.outputs.version }}/" \
+            --output="dist/devbridge-go-sdk-${{ steps.resolve.outputs.version }}.tar.gz" \
+            HEAD:go-sdk
+          (cd dist && sha256sum *.tar.gz > checksums.txt)
+          ls -la dist
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-package-${{ steps.resolve.outputs.version }}
+          path: dist/
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Publish: GitHub Release with --latest=false (never steals CLI latest).
+  # ---------------------------------------------------------------------------
+  publish-github:
+    runs-on: ubuntu-latest
+    needs: package
     permissions:
       contents: write
     steps:
@@ -90,36 +148,75 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Determine tag
-        id: tag
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          fi
+      - name: Download package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: sdk-package-${{ needs.package.outputs.version }}
+          path: dist
 
-      # Manual dispatch only: create the tag on GitHub. A tag pushed via
-      # GITHUB_TOKEN does not re-trigger this workflow.
-      - name: Create tag on GitHub
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          git tag "${{ steps.tag.outputs.tag }}" HEAD
-          git push origin "refs/tags/${{ steps.tag.outputs.tag }}"
-          echo "created tag ${{ steps.tag.outputs.tag }} on GitHub"
-
-      - name: Mirror tag to GitCode
+      - name: Create GitHub Release
         env:
-          GITCODE_TOKEN_INPUT: ${{ inputs.gitcode_token }}
-          GITCODE_TOKEN_SECRET: ${{ secrets.GITCODE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.package.outputs.version }}"
+          TAG="${{ needs.package.outputs.release_tag }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TARGET="--target ${{ github.sha }}"
+          else
+            TARGET=""
+          fi
+          # Pre-release versions (-alpha/-beta/-rc.N) keep the prerelease flag;
+          # stable versions are normal releases. Both pass --latest=false so the
+          # CLI's releases/latest (install.sh) is never replaced.
+          if printf '%s' "$VERSION" | grep -q -- '-'; then
+            PRERELEASE_FLAG="--prerelease"
+          else
+            PRERELEASE_FLAG=""
+          fi
+          gh release create "${TAG}" \
+            ${TARGET} \
+            --title "devbridge-go-sdk ${VERSION}" \
+            --generate-notes \
+            ${PRERELEASE_FLAG} \
+            --latest=false \
+            "dist/devbridge-go-sdk-${VERSION}.tar.gz" \
+            "dist/checksums.txt"
+          echo "created GitHub Release ${TAG}"
+
+  # ---------------------------------------------------------------------------
+  # Mirror: upload the archive to GitCode devbrige with --no-latest.
+  # ---------------------------------------------------------------------------
+  publish-gitcode:
+    runs-on: ubuntu-latest
+    needs: package
+    env:
+      # Manual dispatch may pass the token via input; otherwise fall back to the
+      # repository secret. Prefer the secret for real releases.
+      GITCODE_TOKEN_SECRET: ${{ secrets.GITCODE_TOKEN }}
+      GITCODE_TOKEN_INPUT: ${{ inputs.gitcode_token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download package artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: sdk-package-${{ needs.package.outputs.version }}
+          path: dist
+
+      - name: Upload to GitCode Release
         run: |
           TOKEN="${GITCODE_TOKEN_INPUT:-${GITCODE_TOKEN_SECRET:-}}"
           if [ -z "$TOKEN" ]; then
-            echo "GITCODE_TOKEN not set, skipping GitCode tag sync"
+            echo "GITCODE_TOKEN not set, skipping GitCode upload"
             exit 0
           fi
-          TAG="${{ steps.tag.outputs.tag }}"
-          git tag "${TAG}" HEAD
-          git push "https://oauth2:${TOKEN}@gitcode.com/CloudDeveloperDepartment/devbrige.git" \
-            "refs/tags/${TAG}:refs/tags/${TAG}"
-          echo "synced tag ${TAG} to GitCode"
+          ./cli/scripts/upload-gitcode-release.sh \
+            --no-latest \
+            -t "$TOKEN" \
+            -o CloudDeveloperDepartment \
+            -r devbrige \
+            -v "${{ needs.package.outputs.version }}" \
+            -d ./dist \
+            -n "devbridge-go-sdk ${{ needs.package.outputs.version }}" \
+            -b "DevBridge Go SDK ${{ needs.package.outputs.version }} - source synced from GitHub Release"
