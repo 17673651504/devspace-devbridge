@@ -7,8 +7,9 @@
 #   - verifies the SDK builds cleanly (quality gates);
 #   - publishes a GitHub Release (source tar.gz + checksums.txt) with
 #     --latest=false, so it never steals releases/latest from the CLI;
-#   - mirrors the archive to the GitCode repo devbrige with --no-latest, so the
-#     CLI's rolling latest Release is left untouched.
+#   - pushes the release tag to the GitCode mirror repo devbrige WITHOUT
+#     creating a GitCode Release or uploading any artifact, so the CLI's rolling
+#     latest and one-click install are never affected.
 #
 # Triggers:
 #   pull_request          PR touching go-sdk/**
@@ -184,11 +185,15 @@ jobs:
           echo "created GitHub Release ${TAG}"
 
   # ---------------------------------------------------------------------------
-  # Mirror: upload the archive to GitCode devbrige with --no-latest.
+  # Mirror: push the release tag to the GitCode mirror repo (devbrige) WITHOUT
+  # creating a GitCode Release or uploading any artifact, so the CLI's rolling
+  # latest and one-click install are never affected.
   # ---------------------------------------------------------------------------
-  publish-gitcode:
+  sync-tag:
     runs-on: ubuntu-latest
     needs: package
+    permissions:
+      contents: read
     env:
       # Manual dispatch may pass the token via input; otherwise fall back to the
       # repository secret. Prefer the secret for real releases.
@@ -197,26 +202,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Download package artifact
-        uses: actions/download-artifact@v8
         with:
-          name: sdk-package-${{ needs.package.outputs.version }}
-          path: dist
+          fetch-depth: 0
 
-      - name: Upload to GitCode Release
+      - name: Push tag to GitCode
         run: |
           TOKEN="${GITCODE_TOKEN_INPUT:-${GITCODE_TOKEN_SECRET:-}}"
           if [ -z "$TOKEN" ]; then
-            echo "GITCODE_TOKEN not set, skipping GitCode upload"
+            echo "GITCODE_TOKEN not set, skipping tag sync"
             exit 0
           fi
-          ./cli/scripts/upload-gitcode-release.sh \
-            --no-latest \
-            -t "$TOKEN" \
-            -o CloudDeveloperDepartment \
-            -r devbrige \
-            -v "${{ needs.package.outputs.version }}" \
-            -d ./dist \
-            -n "devbridge-go-sdk ${{ needs.package.outputs.version }}" \
-            -b "DevBridge Go SDK ${{ needs.package.outputs.version }} - source synced from GitHub Release"
+          TAG="${{ needs.package.outputs.release_tag }}"
+          git tag "${TAG}" HEAD
+          git push "https://oauth2:${TOKEN}@gitcode.com/CloudDeveloperDepartment/devbrige.git" \
+            "refs/tags/${TAG}:refs/tags/${TAG}"
+          echo "synced tag ${TAG} to GitCode"
