@@ -42,6 +42,7 @@ DIR=""
 RELEASE_NAME=""
 RELEASE_BODY=""
 LATEST_TAG="latest"
+NO_LATEST=""
 
 API_BASE="https://api.gitcode.com/api/v5"
 GITCODE_BASE="https://gitcode.com"
@@ -88,6 +89,7 @@ while [[ $# -gt 0 ]]; do
     -d|--dir)     DIR="$2"; shift 2 ;;
     -n|--name)    RELEASE_NAME="$2"; shift 2 ;;
     -b|--body)    RELEASE_BODY="$2"; shift 2 ;;
+    --no-latest)  NO_LATEST=1; shift ;;
     -h|--help)    usage ;;
     *)            log_error "unknown option: $1" ;;
   esac
@@ -378,7 +380,10 @@ fi
 # ---------------------------------------------------------------------------
 # 4. Sync the rolling "latest" Release (only the install scripts)
 # ---------------------------------------------------------------------------
-log_info "===== 4/4 syncing the rolling latest Release ====="
+if [[ -n "${NO_LATEST:-}" ]]; then
+  log_info "===== 4/4 skipping the rolling latest Release (--no-latest) ====="
+else
+  log_info "===== 4/4 syncing the rolling latest Release ====="
 
 # The "latest" Release only holds install.sh and install.ps1; the scripts already
 # have the real version and download URL baked in, so users can one-click install
@@ -419,6 +424,8 @@ if [[ "$LATEST_FAILED" -gt 0 ]]; then
   log_warn "${LATEST_FAILED} files of the latest Release failed to upload"
 fi
 
+fi
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
@@ -430,7 +437,9 @@ log_info ""
 log_info "Version Release:"
 log_info "  ${GITCODE_BASE}/${OWNER}/${REPO}/releases/${VERSION}"
 log_info "  curl -fsSL ${GITCODE_BASE}/${OWNER}/${REPO}/releases/download/${VERSION}/install.sh | bash"
-log_info ""
-log_info "Latest (rolling latest):"
-log_info "  ${GITCODE_BASE}/${OWNER}/${REPO}/releases/${LATEST_TAG}"
-log_info "  curl -fsSL ${GITCODE_BASE}/${OWNER}/${REPO}/releases/download/${LATEST_TAG}/install.sh | bash"
+if [[ -z "${NO_LATEST:-}" ]]; then
+  log_info ""
+  log_info "Latest (rolling latest):"
+  log_info "  ${GITCODE_BASE}/${OWNER}/${REPO}/releases/${LATEST_TAG}"
+  log_info "  curl -fsSL ${GITCODE_BASE}/${OWNER}/${REPO}/releases/download/${LATEST_TAG}/install.sh | bash"
+fi
