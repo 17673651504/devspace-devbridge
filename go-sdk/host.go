@@ -140,7 +140,10 @@ func (d *Devbridge) runHostSession(ctx context.Context, params sessionParams, on
 	if err != nil {
 		return false, err
 	}
-	defer func() { _ = netConn.Close() }()
+	defer func() {
+		_ = outerSession.Close()
+		_ = netConn.Close()
+	}()
 
 	d.logger.Debug("host: outer SSH session established", "tunnelID", params.tunnelID)
 
@@ -182,6 +185,7 @@ func (d *Devbridge) connectOuterSession(ctx context.Context, params sessionParam
 	outerSession.Trace = sshTraceFunc(d.logger)
 
 	if err := outerSession.Connect(ctx, netConn); err != nil {
+		_ = outerSession.Close()
 		_ = netConn.Close()
 		return nil, nil, fmt.Errorf("outer SSH connect failed: %w", parseSSHCloseError(err))
 	}
@@ -299,10 +303,13 @@ func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.C
 
 		switch channel.ChannelType {
 		case relayChannelType:
+			var stream *ssh.Stream
 			if !pn.received.Load() {
 				// Treat the first relay channel as the gateway's port notification only when it
 				// parses as a RelayRequest; otherwise forward it as normal data.
-				notifPorts, isNotif := readPortNotification(channel)
+				var notifPorts []int
+				var isNotif bool
+				stream, notifPorts, isNotif = readPortNotification(channel)
 				if isNotif {
 					if len(ports) == 0 {
 						pn.ports = notifPorts
@@ -317,7 +324,7 @@ func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.C
 			if len(effectivePorts) == 0 {
 				effectivePorts = pn.ports
 			}
-			go d.handleRelayChannel(ctx, channel, effectivePorts)
+			go d.handleRelayChannel(ctx, channel, stream, effectivePorts)
 		default:
 			d.logger.Debug("host: draining non-relay channel",
 				"channelType", channel.ChannelType, "channelID", channel.ChannelID)
@@ -326,15 +333,22 @@ func (d *Devbridge) startHostAcceptLoop(ctx context.Context, outerSession *ssh.C
 }
 
 // readPortNotification reports whether a relay channel is the gateway's port
-// notification; callers forward the channel as data when it returns false.
-func readPortNotification(channel *ssh.Channel) ([]int, bool) {
-	stream := ssh.NewStream(channel)
+// notification. When isNotif is false it returns the stream already wrapping the
+// channel so the caller can forward any buffered bytes as data without losing them.
+// When isNotif is true the notification has been consumed and the stream closed.
+func readPortNotification(channel *ssh.Channel) (stream *ssh.Stream, ports []int, isNotif bool) {
+	stream = ssh.NewStream(channel)
 	buf := make([]byte, 4096)
 	n, err := stream.Read(buf)
 	if err != nil {
-		return nil, false
+		return stream, nil, false
 	}
-	return parsePortNotification(buf[:n])
+	ports, isNotif = parsePortNotification(buf[:n])
+	if isNotif {
+		_ = stream.Close()
+		return nil, ports, true
+	}
+	return stream, nil, false
 }
 
 // parsePortNotification returns the ports of a RelayRequest payload, or false when
@@ -354,15 +368,19 @@ func parsePortNotification(data []byte) ([]int, bool) {
 	return ports, true
 }
 
-func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel, ports []int) {
+func (d *Devbridge) handleRelayChannel(ctx context.Context, channel *ssh.Channel, stream *ssh.Stream, ports []int) {
 	innerConfig := ssh.NewNoSecurityConfig()
 	tcp.AddPortForwardingService(innerConfig)
 	innerSession := ssh.NewServerSession(innerConfig)
 	innerSession.Credentials = &ssh.ServerCredentials{PublicKeys: []ssh.KeyPair{persistentHostKey}}
 	innerSession.Trace = sshTraceFunc(d.logger)
 
-	if err := innerSession.Connect(ctx, ssh.NewStream(channel)); err != nil {
+	if stream == nil {
+		stream = ssh.NewStream(channel)
+	}
+	if err := innerSession.Connect(ctx, stream); err != nil {
 		d.logger.Error("inner SSH session failed", "channelID", channel.ChannelID, "err", err)
+		_ = innerSession.Close()
 		return
 	}
 	d.logger.Debug("host: inner SSH server session established", "channelID", channel.ChannelID)
