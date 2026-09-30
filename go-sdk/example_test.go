@@ -69,7 +69,7 @@ func ExampleDevbridge_fullWorkflow() {
 	// 5. Cleanup
 	connectCancel()
 	hostCancel()
-	client.DeleteTunnel(ctx, tunnel.ID)
+	_ = client.DeleteTunnel(ctx, tunnel.ID)
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -167,8 +167,8 @@ func ExampleDevbridge_tunnelManagement() {
 
 	// Update the tunnel
 	newName := "renamed-tunnel"
-	client.UpdateTunnel(ctx, tunnel.ID, &newName, nil, nil)
+	_ = client.UpdateTunnel(ctx, tunnel.ID, &newName, nil, nil)
 
 	// Delete the tunnel
-	client.DeleteTunnel(ctx, tunnel.ID)
+	_ = client.DeleteTunnel(ctx, tunnel.ID)
 }

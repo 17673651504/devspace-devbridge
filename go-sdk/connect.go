@@ -54,6 +54,9 @@ func (d *Devbridge) Connect(ctx context.Context, cfg ConnectConfig) error {
 	apiKey := cfg.APIKey
 	if apiKey == "" && cfg.JWTToken == "" {
 		apiKey = d.apiKey
+		if apiKey == "" {
+			return ErrMissingAPIKey
+		}
 	}
 
 	header, subprotocols := buildWSHeader(cfg.JWTToken, apiKey)
@@ -178,7 +181,7 @@ func newListenerFactory(expectedCount int, localIP string, outputWriter io.Write
 // CreateTCPListener implements the tcp.ListenerFactory interface.
 func (f *listenerFactory) CreateTCPListener(
 	remotePort int,
-	localIPAddress string,
+	_ string,
 	localPort int,
 	canChangeLocalPort bool,
 ) (net.Listener, error) {

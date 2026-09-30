@@ -80,6 +80,9 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 	apiKey := cfg.APIKey
 	if apiKey == "" && cfg.JWTToken == "" {
 		apiKey = d.apiKey
+		if apiKey == "" {
+			return ErrMissingAPIKey
+		}
 	}
 
 	header, subprotocols := buildWSHeader(cfg.JWTToken, apiKey)
