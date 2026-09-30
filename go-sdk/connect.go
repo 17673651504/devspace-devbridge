@@ -241,7 +241,7 @@ func (f *listenerFactory) printForwardings() {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for _, msg := range f.pendingForwardings {
-		fmt.Fprint(f.outputWriter, msg)
+		_, _ = fmt.Fprint(f.outputWriter, msg)
 	}
 }
 

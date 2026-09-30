@@ -66,11 +66,10 @@ var pingCmd = &cobra.Command{
 						statusText,
 						result.Latency.Milliseconds(), result.Err)
 					return nil
-				} else {
-					fmt.Printf("HTTP %s -- %d ms\n",
-						statusText,
-						result.Latency.Milliseconds())
 				}
+				fmt.Printf("HTTP %s -- %d ms\n",
+					statusText,
+					result.Latency.Milliseconds())
 			}
 			select {
 			case <-ctx.Done():

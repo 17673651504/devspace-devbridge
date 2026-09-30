@@ -135,11 +135,11 @@ func warmDNS(gatewayAddr string) {
 }
 
 func (d *Devbridge) statusf(format string, args ...any) {
-	fmt.Fprintf(d.outputWriter, format, args...)
+	_, _ = fmt.Fprintf(d.outputWriter, format, args...)
 }
 
 func (d *Devbridge) statusln(args ...any) {
-	fmt.Fprintln(d.outputWriter, args...)
+	_, _ = fmt.Fprintln(d.outputWriter, args...)
 }
 
 func validateTunnelID(id string) error {
