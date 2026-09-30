@@ -7,6 +7,8 @@ package sdk
 import (
 	"context"
 	"fmt"
+
+	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/i18n"
 )
 
 // REST API path patterns for tunnel management.
@@ -33,7 +35,7 @@ func (d *Devbridge) CreateTunnel(ctx context.Context, name, description string, 
 	}
 	if expiration != nil {
 		if *expiration < 1 || *expiration > 720 {
-			return nil, fmt.Errorf("expiration must be 1-720 hours, got %d", *expiration)
+			return nil, fmt.Errorf(i18n.T(i18n.MsgInvalidExpiration), *expiration)
 		}
 		req.Expiration = *expiration
 	}
@@ -87,7 +89,7 @@ func (d *Devbridge) UpdateTunnel(ctx context.Context, tunnelID string, name, des
 	}
 	if expiration != nil {
 		if *expiration < 1 || *expiration > 720 {
-			return fmt.Errorf("expiration must be 1-720 hours, got %d", *expiration)
+			return fmt.Errorf(i18n.T(i18n.MsgInvalidExpiration), *expiration)
 		}
 		req.Expiration = expiration
 	}

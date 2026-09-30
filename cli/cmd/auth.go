@@ -50,7 +50,7 @@ var loginCmd = &cobra.Command{
 		}
 
 		if err := auth.VerifyAPIKey(cred.APIKey); err != nil {
-			return fmt.Errorf("login failed: %w", err)
+			return fmt.Errorf("%s: %w", i18n.T(i18n.Msg.Auth.LoginFailed), err)
 		}
 		if err := auth.StoreCredential(auth.CredentialName, &cred, userInfo); err != nil {
 			return err

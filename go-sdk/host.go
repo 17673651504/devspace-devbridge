@@ -16,6 +16,8 @@ import (
 
 	"github.com/microsoft/dev-tunnels-ssh/src/go/ssh"
 	"github.com/microsoft/dev-tunnels-ssh/src/go/tcp"
+
+	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/i18n"
 )
 
 // Session tuning constants shared by Host and Connect sessions. Kept as
@@ -70,7 +72,7 @@ func ensureHostKey() error {
 //  4. Forward traffic from the remote side to the local port
 func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 	if err := ensureHostKey(); err != nil {
-		return fmt.Errorf("generate host key: %w", err)
+		return fmt.Errorf("%s: %w", i18n.T(i18n.MsgHostKeyFailed), err)
 	}
 	if err := validateTunnelID(cfg.TunnelID); err != nil {
 		return err
@@ -118,7 +120,7 @@ func (d *Devbridge) Host(ctx context.Context, cfg HostConfig) error {
 			return false
 		},
 		onReconnect: func(err error) {
-			d.statusln("Connection lost, reconnecting...")
+			d.statusln(i18n.T(i18n.MsgReconnecting))
 		},
 		onConnected: func() {
 			everConnected = true
@@ -175,7 +177,7 @@ func (d *Devbridge) connectOuterSession(ctx context.Context, params sessionParam
 	netConn, err := d.dialWebSocket(ctx, params.wsURL, params.sniHost, params.header, params.subprotocols, 5)
 	if err != nil {
 		if errors.Is(err, ErrDuplicateHost) {
-			return nil, nil, fmt.Errorf("outer SSH connect failed: %w", err)
+			return nil, nil, fmt.Errorf("%s: %w", i18n.T(i18n.MsgOuterSSHFailed), err)
 		}
 		return nil, nil, err
 	}
@@ -190,7 +192,7 @@ func (d *Devbridge) connectOuterSession(ctx context.Context, params sessionParam
 	if err := outerSession.Connect(ctx, netConn); err != nil {
 		_ = outerSession.Close()
 		_ = netConn.Close()
-		return nil, nil, fmt.Errorf("outer SSH connect failed: %w", parseSSHCloseError(err))
+		return nil, nil, fmt.Errorf("%s: %w", i18n.T(i18n.MsgOuterSSHFailed), parseSSHCloseError(err))
 	}
 	return outerSession, netConn, nil
 }
@@ -229,10 +231,10 @@ func (d *Devbridge) waitForGatewayPorts(ctx context.Context, outerSession *ssh.C
 		d.logger.Warn("timeout waiting for port notification from gateway")
 	case <-diag.disconnected:
 		d.logDiagnosticClose(tunnelID, diag)
-		return fmt.Errorf("disconnected")
+		return fmt.Errorf(i18n.T(i18n.MsgSessionDisconnected))
 	case <-outerSession.Session.Done():
 		d.logDiagnosticClose(tunnelID, diag)
-		return fmt.Errorf("session closed")
+		return fmt.Errorf(i18n.T(i18n.MsgSessionClosed))
 	}
 	return nil
 }
@@ -240,17 +242,17 @@ func (d *Devbridge) waitForGatewayPorts(ctx context.Context, outerSession *ssh.C
 func (d *Devbridge) reportReady(tunnelID string, ports []int, onReady func([]int)) {
 	realPorts := filterForwardPorts(ports)
 	if len(realPorts) == 0 && len(ports) > 0 {
-		d.statusln("All ports mode: this tunnel accepts any port via URL")
-		d.statusf("Access your service at: https://%s-<port>.%s\n", tunnelID, d.gatewayHost)
+		d.statusln(i18n.T(i18n.MsgAllPortsAnyPort))
+		d.statusf(i18n.T(i18n.MsgAccessServiceAt), tunnelID, d.gatewayHost)
 	}
 	for _, p := range realPorts {
-		d.statusf("Hosting port: %s%d%s\n", colorCyan, p, colorReset)
+		d.statusf(i18n.T(i18n.MsgHostingPort), colorCyan, p, colorReset)
 	}
 	for _, p := range realPorts {
-		d.statusf("Tunnel URL: https://%s-%d.%s\n", tunnelID, p, d.gatewayHost)
+		d.statusf(i18n.T(i18n.MsgTunnelURL), tunnelID, p, d.gatewayHost)
 	}
-	d.statusln("Ready to accept connections")
-	d.statusln("Auto reconnect: enabled")
+	d.statusln(i18n.T(i18n.MsgReadyToAccept))
+	d.statusln(i18n.T(i18n.MsgAutoReconnectEnabled))
 	if onReady != nil {
 		onReady(realPorts)
 	}
@@ -261,10 +263,10 @@ func (d *Devbridge) waitSessionEnd(ctx context.Context, outerSession *ssh.Client
 		select {
 		case <-diag.disconnected:
 			d.logDiagnosticClose(tunnelID, diag)
-			return true, fmt.Errorf("disconnected")
+			return true, fmt.Errorf(i18n.T(i18n.MsgSessionDisconnected))
 		case <-outerSession.Session.Done():
 			d.logDiagnosticClose(tunnelID, diag)
-			return true, fmt.Errorf("session closed")
+			return true, fmt.Errorf(i18n.T(i18n.MsgSessionClosed))
 		case <-ctx.Done():
 			return true, nil
 		}

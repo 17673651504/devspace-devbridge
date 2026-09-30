@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/i18n"
 )
 
 // Reconnect tuning shared by Host and Connect. Both session loops use the
@@ -64,7 +66,7 @@ func (d *Devbridge) reconnectLoop(ctx context.Context, run reconnectSession, dec
 		}
 		if consecutiveFailures >= maxReconnectAttempts {
 			d.logger.Debug("reconnect exhausted", "maxAttempts", maxReconnectAttempts, "err", err)
-			return fmt.Errorf("reconnect failed after %d attempts: %w", maxReconnectAttempts, err)
+			return fmt.Errorf(i18n.T(i18n.MsgReconnectExhausted), maxReconnectAttempts, err)
 		}
 
 		if decision.onReconnect != nil {

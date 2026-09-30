@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"huawei.com/devbridge/internal/config"
+	"huawei.com/devbridge/internal/i18n"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 )
 
 // errAPIKeyInvalid indicates the API Key is invalid (401).
-var errAPIKeyInvalid = errors.New("api key is invalid or disabled")
+var errAPIKeyInvalid = errors.New(i18n.T(i18n.Msg.Auth.APIKeyInvalid))
 
 var verifyClient = &http.Client{
 	Timeout: 10 * time.Second,
@@ -34,7 +35,7 @@ func VerifyAPIKey(apiKey string) error {
 	url := strings.TrimRight(config.DefaultServerDomain, "/") + authCheckPath
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return fmt.Errorf("build verify request: %w", err)
+		return fmt.Errorf("%s: %w", i18n.T(i18n.Msg.Auth.VerifyRequestFailed), err)
 	}
 	req.Header.Set(headerXAPIKey, apiKey)
 
@@ -43,12 +44,12 @@ func VerifyAPIKey(apiKey string) error {
 	start := time.Now()
 	resp, err := verifyClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("verify api key: %w", err)
+		return fmt.Errorf("%s: %w", i18n.T(i18n.Msg.Auth.VerifyAPIKeyFailed), err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
 	if err != nil {
-		return fmt.Errorf("read verify response: %w", err)
+		return fmt.Errorf("%s: %w", i18n.T(i18n.Msg.Auth.VerifyResponseRead), err)
 	}
 
 	logVerifyResponse(resp, body, time.Since(start))
@@ -59,7 +60,7 @@ func VerifyAPIKey(apiKey string) error {
 	case http.StatusUnauthorized:
 		return errAPIKeyInvalid
 	default:
-		return fmt.Errorf("verify api key: unexpected status %d, body=%s", resp.StatusCode, string(body))
+		return fmt.Errorf(i18n.T(i18n.Msg.Auth.VerifyUnexpected), resp.StatusCode, string(body))
 	}
 }
 

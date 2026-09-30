@@ -19,6 +19,8 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/microsoft/dev-tunnels-ssh/src/go/ssh"
+
+	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/i18n"
 )
 
 const (
@@ -131,11 +133,11 @@ func (d *Devbridge) dialWithRetry(ctx context.Context, url string, opts *websock
 			_ = resp.Body.Close()
 			reason := strings.TrimSpace(string(body))
 			if attempt == 0 {
-				d.statusf("Connection rejected by gateway: %s, retrying...\n", reason)
+				d.statusf(i18n.T(i18n.MsgGatewayRejected), reason)
 			}
-			lastErr = fmt.Errorf("connection rejected by gateway (429): %s", reason)
+			lastErr = fmt.Errorf(i18n.T(i18n.MsgGatewayRejected429), reason)
 		} else if attempt == 0 {
-			d.statusln("Connection failed, retrying...")
+			d.statusln(i18n.T(i18n.MsgConnectionFailedRetrying))
 		}
 
 		if attempt == maxRetries {
@@ -151,11 +153,11 @@ func (d *Devbridge) dialWithRetry(ctx context.Context, url string, opts *websock
 
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("websocket dial cancelled: %w", ctx.Err())
+			return nil, fmt.Errorf(i18n.T(i18n.MsgDialCancelled), ctx.Err())
 		case <-time.After(jittered):
 		}
 	}
-	return nil, fmt.Errorf("websocket dial failed after %d retries: %w", maxRetries, lastErr)
+	return nil, fmt.Errorf(i18n.T(i18n.MsgDialFailedRetries), maxRetries, lastErr)
 }
 
 // sshTraceFunc returns a trace function that logs SSH protocol events: errors
