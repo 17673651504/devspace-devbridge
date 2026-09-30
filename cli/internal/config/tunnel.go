@@ -2,7 +2,8 @@ package config
 
 import (
 	"errors"
-	"fmt"
+
+	"huawei.com/devbridge/internal/i18n"
 )
 
 const (
@@ -23,8 +24,7 @@ func LoadDefaultTunnel() (string, error) {
 			return s, nil
 		}
 	}
-	return "", fmt.Errorf("tunnel ID not specified and no default tunnel set, " +
-		"please specify via argument or use 'devbridge set' to set default")
+	return "", errors.New(i18n.T(i18n.Msg.Config.NoDefaultTunnel))
 }
 
 // DeleteDefaultTunnel deletes the default tunnel ID; a missing key is treated as already deleted.
