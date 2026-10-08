@@ -1,4 +1,4 @@
-module github.com/huaweicloud/devspace-devbridge/go-sdk
+module github.com/17673651504/devspace-devbridge/go-sdk
 
 go 1.22.0
 

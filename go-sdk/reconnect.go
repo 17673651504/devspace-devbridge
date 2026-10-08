@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/i18n"
+	"github.com/17673651504/devspace-devbridge/go-sdk/internal/i18n"
 )
 
 // Reconnect tuning shared by Host and Connect. Both session loops use the

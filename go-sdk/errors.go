@@ -7,7 +7,7 @@ package sdk
 import (
 	"errors"
 
-	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/httpclient"
+	"github.com/17673651504/devspace-devbridge/go-sdk/internal/httpclient"
 )
 
 var ErrMissingAPIKey = errors.New("missing API key: set it via Config.APIKey or HW_API_KEY env var")

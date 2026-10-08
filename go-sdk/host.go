@@ -17,7 +17,7 @@ import (
 	"github.com/microsoft/dev-tunnels-ssh/src/go/ssh"
 	"github.com/microsoft/dev-tunnels-ssh/src/go/tcp"
 
-	"github.com/huaweicloud/devspace-devbridge/go-sdk/internal/i18n"
+	"github.com/17673651504/devspace-devbridge/go-sdk/internal/i18n"
 )
 
 // Session tuning constants shared by Host and Connect sessions. Kept as
