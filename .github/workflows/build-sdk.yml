@@ -214,6 +214,6 @@ jobs:
           fi
           TAG="${{ needs.package.outputs.release_tag }}"
           git tag "${TAG}" HEAD
-          git push "https://oauth2:${TOKEN}@gitcode.com/CloudDeveloperDepartment/devbrige.git" \
+          git push "https://oauth2:${TOKEN}@gitcode.com/l30082028/hdspace-devbrige.git" \
             "refs/tags/${TAG}:refs/tags/${TAG}"
           echo "synced tag ${TAG} to GitCode"
