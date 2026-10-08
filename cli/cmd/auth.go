@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	devbridge "github.com/huaweicloud/devspace-devbridge/go-sdk"
+	devbridge "github.com/17673651504/devspace-devbridge/go-sdk"
 	"github.com/spf13/cobra"
 	"huawei.com/devbridge/internal/auth"
 	"huawei.com/devbridge/internal/config"

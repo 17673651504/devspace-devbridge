@@ -10,6 +10,7 @@
   - 包名 `devbridge` → `sdk`（与模块路径末段一致）
   - 业务对象 `Client` 更名 `Devbridge`，构造函数 `NewClient` → `New`
   - HTTP 通信实现下沉至 `internal/httpclient`（外部不可导入）
+- 模块路径 `github.com/huaweicloud/devspace-devbridge/go-sdk` → `github.com/17673651504/devspace-devbridge/go-sdk`（跟随 fork 仓库地址，本条目之后的 tag 以新路径解析）
 - 迁移方式：将 `devbridge.` 前缀替换为 `sdk.`，`NewClient(...)` 替换为 `New(...)`
 
 ## v0.1.0（2026-09-14）
