@@ -52,8 +52,8 @@ ls -la "${GITCODE_DIR}"/
 DISPLAY_NAME="cli-release-$(echo "${VERSION}" | sed 's/-release$//')"
 "${SCRIPT_DIR}/upload-gitcode-release.sh" \
     -t "${GITCODE_TOKEN}" \
-    -o CloudDeveloperDepartment \
-    -r devbrige \
+    -o l30082028 \
+    -r hdspace-devbrige \
     -v "${VERSION}" \
     -d "${GITCODE_DIR}" \
     -n "${DISPLAY_NAME}" \
