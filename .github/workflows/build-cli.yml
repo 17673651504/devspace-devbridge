@@ -11,7 +11,7 @@
 #   otherwise                   → build and package, skip publish.
 #
 # Artifacts: 6 platform tar.gz + checksums.txt + baked install.sh/install.ps1.
-# Targets: GitHub Release and GitCode Release (CloudDeveloperDepartment/devbrige).
+# Targets: GitHub Release (this repo) and GitCode Release (l30082028/hdspace-devbrige).
 #
 # NOTE: gitcode_token is passed as a workflow input because this repo cannot
 # store secrets (no write access). It is visible to anyone with read access;
